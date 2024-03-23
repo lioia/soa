@@ -1,0 +1,10 @@
+.cache/
+compile_commands.json
+.Module*
+.modules*
+.reference_monitor*
+.the_reference_monitor*
+Module*
+modules*
+the_reference_monitor*
+reference_monitor.o

@@ -1,0 +1,3 @@
+[submodule "libs/sys_call_table_discoverer"]
+	path = libs/sys_call_table_discoverer
+	url = https://github.com/FrancescoQuaglia/Linux-sys_call_table-discoverer
