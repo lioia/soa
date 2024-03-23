@@ -28,6 +28,6 @@ sudo make umount
 To generate `compile_commands.json`, [bear](https://github.com/rizsotto/Bear)
 is required:
 
-```
+```bash
 bear -- make
 ```
