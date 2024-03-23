@@ -22,3 +22,12 @@ sudo make mount
 ```bash
 sudo make umount
 ```
+
+## Editor Setup
+
+To generate `compile_commands.json`, [bear](https://github.com/rizsotto/Bear)
+is required:
+
+```
+bear -- make
+```
