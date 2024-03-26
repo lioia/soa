@@ -1,5 +1,8 @@
+# Development setup
 .cache/
 compile_commands.json
+
+# Build artifacts
 .Module*
 .modules*
 .reference_monitor*
@@ -7,4 +10,6 @@ compile_commands.json
 Module*
 modules*
 the_reference_monitor*
-reference_monitor.o
+*.o
+*.o.cmd
+user
