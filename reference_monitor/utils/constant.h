@@ -1,0 +1,8 @@
+#ifndef CONSTANT_H
+
+#define REFMON_STATE_OFF 0b00
+#define REFMON_STATE_ON 0b01
+#define REFMON_STATE_REC_OFF 0b10
+#define REFMON_STATE_REC_ON 0b11
+
+#endif

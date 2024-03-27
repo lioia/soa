@@ -1,4 +1,3 @@
-#include "linux/printk.h"
 #define EXPORT_SYMTAB
 
 #include <asm/apic.h>
@@ -15,6 +14,7 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/printk.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -24,6 +24,8 @@
 #include <linux/vmalloc.h>
 
 #include "libs/scth.h"
+#include "utils/constant.h"
+#include "utils/crypto.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Alessandro Lioi <alessandro.lioi@students.uniroma2.it>");
@@ -54,13 +56,16 @@ long sys_print = (unsigned long)__x64_sys_print;
 #endif
 
 struct reference_monitor {
-  int state : 2;
-  char *password_hash; // NOTE: check what crypt does
+  int state : 2;                // Using only 2 bits for the state (4 possible values)
+  unsigned char *password_hash; // Reference Monitor Password Hash
 };
+
+struct reference_monitor refmon = {0};
 
 int init_module(void) {
   printk("%s: init\n", MODNAME);
 
+  // System Call Initialization (from printk-example)
   if (the_syscall_table == 0x0) {
     printk("%s: cannot manage sys_call_table address set to 0x0\n", MODNAME);
     return -1;
@@ -81,16 +86,35 @@ int init_module(void) {
 
   printk("%s: all new system-calls correctly installed on sys-call table\n", MODNAME);
 
+  // Reference Monitor initialization
+  refmon.state = REFMON_STATE_OFF;
+  refmon.password_hash = kmalloc(sizeof(*refmon.password_hash) * 32, GFP_KERNEL);
+  if (refmon.password_hash == NULL) {
+    printk(KERN_ERR "failed to allocate password_hash\n");
+    return -ENOMEM;
+  }
+  refmon.password_hash = crypt_data("reference_monitor_default_password");
+  if (refmon.password_hash == NULL) {
+    printk(KERN_ERR "failed to crypt_data for default password\n");
+    return -ENOMEM;
+  }
+  printk("%s: correctly initialized\n", MODNAME);
+
   return 0;
 }
 
 void cleanup_module(void) {
   printk("%s: cleanup\n", MODNAME);
+
+  // System Call Cleanup
   unprotect_memory();
   for (int i = 0; i < HACKED_ENTRIES; i++) {
     ((unsigned long *)the_syscall_table)[restore[i]] = the_ni_syscall;
   }
   protect_memory();
+
+  // Reference Monitor Cleanup
+  kfree(refmon.password_hash);
 
   printk("%s: sys-call table restored to its original content\n", MODNAME);
 }
