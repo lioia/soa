@@ -24,14 +24,12 @@
 #include <linux/vmalloc.h>
 
 #include "libs/scth.h"
-#include "utils/constant.h"
+#include "reference_monitor.h"
 #include "utils/crypto.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Alessandro Lioi <alessandro.lioi@students.uniroma2.it>");
 MODULE_DESCRIPTION("Reference Monitor");
-
-#define MODNAME "REFMON"
 
 unsigned long the_syscall_table = 0x0;
 module_param(the_syscall_table, ulong, 0660);
@@ -55,9 +53,15 @@ long sys_print = (unsigned long)__x64_sys_print;
 #else
 #endif
 
+struct reference_monitor_path {
+  char *path;
+  struct list_head list;
+};
+
 struct reference_monitor {
   int state : 2;                // Using only 2 bits for the state (4 possible values)
   unsigned char *password_hash; // Reference Monitor Password Hash
+  struct reference_monitor_path paths;
 };
 
 struct reference_monitor refmon = {0};
@@ -98,6 +102,7 @@ int init_module(void) {
     printk(KERN_ERR "failed to crypt_data for default password\n");
     return -ENOMEM;
   }
+  INIT_LIST_HEAD(&refmon.paths.list);
   printk("%s: correctly initialized\n", MODNAME);
 
   return 0;
