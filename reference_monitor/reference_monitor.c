@@ -35,21 +35,63 @@ unsigned long the_syscall_table = 0x0;
 module_param(the_syscall_table, ulong, 0660);
 
 unsigned long the_ni_syscall;
-unsigned long new_sys_call_array[] = {0x0};
+unsigned long new_sys_call_array[] = {0x0, 0x0, 0x0, 0x0};
 #define HACKED_ENTRIES (int)(sizeof(new_sys_call_array) / sizeof(unsigned long))
 int restore[HACKED_ENTRIES] = {[0 ...(HACKED_ENTRIES - 1)] = -1};
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-__SYSCALL_DEFINEx(1, _print, unsigned long, none) {
+__SYSCALL_DEFINEx(2, _reference_monitor_change_password, const char *, password, const char *, old_password) {
 #else
-asmlinkage long sys_print(void) {
+asmlinkage long sys_reference_monitor_change_password(const char *password, const char *old_password) {
 #endif
   printk(KERN_INFO "%s: message priority %s\n", MODNAME, KERN_INFO);
   return 0;
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-long sys_print = (unsigned long)__x64_sys_print;
+long sys_reference_monitor_change_password = (unsigned long)__x64_sys_reference_monitor_change_password;
+#else
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+__SYSCALL_DEFINEx(2, _reference_monitor_set_state, const char *, password, int, state) {
+#else
+asmlinkage long sys_reference_monitor_set_state(const char *password, int state) {
+#endif
+  printk(KERN_INFO "%s: message priority %s\n", MODNAME, KERN_INFO);
+  return 0;
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+long sys_reference_monitor_set_state = (unsigned long)__x64_sys_reference_monitor_set_state;
+#else
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+__SYSCALL_DEFINEx(2, _reference_monitor_add_path, const char *, password, const char *, path) {
+#else
+asmlinkage long sys_reference_monitor_add_path(const char *password, const char *path) {
+#endif
+  printk(KERN_INFO "%s: message priority %s\n", MODNAME, KERN_INFO);
+  return 0;
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+long sys_reference_monitor_add_path = (unsigned long)__x64_sys_reference_monitor_add_path;
+#else
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+__SYSCALL_DEFINEx(2, _reference_monitor_delete_path, const char *, password, const char *, path) {
+#else
+asmlinkage long sys_reference_monitor_delete_path(const char *password, const char *path) {
+#endif
+  printk(KERN_INFO "%s: message priority %s\n", MODNAME, KERN_INFO);
+  return 0;
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+long sys_reference_monitor_delete_path = (unsigned long)__x64_sys_reference_monitor_delete_path;
 #else
 #endif
 
@@ -59,9 +101,9 @@ struct reference_monitor_path {
 };
 
 struct reference_monitor {
-  int state : 2;                // Using only 2 bits for the state (4 possible values)
-  unsigned char *password_hash; // Reference Monitor Password Hash
-  struct reference_monitor_path paths;
+  int state : 2;                       // Using only 2 bits for the state (4 possible values)
+  unsigned char *password_hash;        // Reference Monitor Password Hash
+  struct reference_monitor_path paths; // Paths to monitor, in a linked list
 };
 
 struct reference_monitor refmon = {0};
@@ -69,12 +111,15 @@ struct reference_monitor refmon = {0};
 int init_module(void) {
   printk("%s: init\n", MODNAME);
 
-  // System Call Initialization (from printk-example)
+  // System Call Initialization
   if (the_syscall_table == 0x0) {
     printk("%s: cannot manage sys_call_table address set to 0x0\n", MODNAME);
     return -1;
   }
-  new_sys_call_array[0] = (unsigned long)sys_print;
+  new_sys_call_array[0] = (unsigned long)sys_reference_monitor_change_password;
+  new_sys_call_array[1] = (unsigned long)sys_reference_monitor_set_state;
+  new_sys_call_array[2] = (unsigned long)sys_reference_monitor_add_path;
+  new_sys_call_array[3] = (unsigned long)sys_reference_monitor_delete_path;
   int ret = get_entries(restore, HACKED_ENTRIES, (unsigned long *)the_syscall_table, &the_ni_syscall);
   if (ret != HACKED_ENTRIES) {
     printk("%s: could not hack %d entries (just %d)\n", MODNAME, HACKED_ENTRIES, ret);
