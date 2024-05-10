@@ -6,55 +6,63 @@
 #include <linux/printk.h>
 #include <linux/string.h>
 
-// Adapter from https://github.com/torvalds/linux/blob/master/Documentation/crypto/api-samples.rst
+// Adapted from https://github.com/torvalds/linux/blob/master/Documentation/crypto/api-samples.rst
 
 char *crypt_data(const unsigned char *data) {
-  struct crypto_shash *alg = crypto_alloc_shash("sha256", 0, 0);
+  // Variable Declaration
+  struct crypto_shash *alg;
+  int size, ret, i;
+  struct shash_desc *sdesc;
+  char *digest, *result;
+
+  result = NULL;
+
+  alg = crypto_alloc_shash("sha256", 0, 0);
   if (IS_ERR(alg)) {
     printk(KERN_ERR "failed to allocate alg for sha256\n");
     return NULL;
   }
-  int size = sizeof(struct shash_desc) + crypto_shash_descsize(alg);
-  struct shash_desc *sdesc = kmalloc(size, GFP_KERNEL);
+  size = sizeof(struct shash_desc) + crypto_shash_descsize(alg);
+  sdesc = kmalloc(size, GFP_KERNEL);
   if (sdesc == NULL) {
-    crypto_free_shash(alg);
     printk(KERN_ERR "failed to allocate sdesc\n");
-    return NULL;
+    goto free_alg;
   }
   sdesc->tfm = alg;
 
-  char *digest = kmalloc(sizeof(*digest) * 32, GFP_KERNEL);
+  digest = kmalloc(sizeof(*digest) * 32, GFP_KERNEL);
   if (digest == NULL) {
-    crypto_free_shash(alg);
-    kfree(sdesc);
     printk(KERN_ERR "failed to allocate digest\n");
-    return NULL;
+    goto free_sdesc_alg;
   }
 
-  int ret = crypto_shash_digest(sdesc, data, strlen(data), digest);
+  ret = crypto_shash_digest(sdesc, data, strlen(data), digest);
   if (ret) {
-    crypto_free_shash(alg);
-    kfree(sdesc);
-    kfree(digest);
     printk(KERN_ERR "failed to calculate digest\n");
-    return NULL;
+    goto free_all;
   }
-  char *result = kmalloc(2 * 32 + 1, GFP_KERNEL);
+  result = kmalloc(2 * 32 + 1, GFP_KERNEL);
   if (!result) {
     printk(KERN_ERR "failed to allocate result\n");
-    return NULL;
+    goto free_all;
   }
-  for (int i = 0; i < 32; i++)
+  for (i = 0; i < 32; i++)
     sprintf(&result[i * 2], "%02x", digest[i]);
 
-  crypto_free_shash(alg);
-  kfree(sdesc);
+free_all:
   kfree(digest);
+free_sdesc_alg:
+  kfree(sdesc);
+free_alg:
+  crypto_free_shash(alg);
   return result;
 }
 
 int check_hash(const unsigned char *data, const unsigned char *hashed) {
-  char *out = crypt_data(data);
+  // Variable Declaration
+  char *out;
+
+  out = crypt_data(data);
   if (out == NULL) {
     printk(KERN_ERR "failed to crypt data\n");
     return -1;

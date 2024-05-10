@@ -109,6 +109,9 @@ struct reference_monitor {
 struct reference_monitor refmon = {0};
 
 int init_module(void) {
+  // Variable Declaration
+  int i, ret;
+
   printk("%s: init\n", MODNAME);
 
   // System Call Initialization
@@ -120,14 +123,14 @@ int init_module(void) {
   new_sys_call_array[1] = (unsigned long)sys_reference_monitor_set_state;
   new_sys_call_array[2] = (unsigned long)sys_reference_monitor_add_path;
   new_sys_call_array[3] = (unsigned long)sys_reference_monitor_delete_path;
-  int ret = get_entries(restore, HACKED_ENTRIES, (unsigned long *)the_syscall_table, &the_ni_syscall);
+  ret = get_entries(restore, HACKED_ENTRIES, (unsigned long *)the_syscall_table, &the_ni_syscall);
   if (ret != HACKED_ENTRIES) {
     printk("%s: could not hack %d entries (just %d)\n", MODNAME, HACKED_ENTRIES, ret);
     return -1;
   }
   unprotect_memory();
 
-  for (int i = 0; i < HACKED_ENTRIES; i++) {
+  for (i = 0; i < HACKED_ENTRIES; i++) {
     ((unsigned long *)the_syscall_table)[restore[i]] = (unsigned long)new_sys_call_array[i];
   }
 
@@ -154,11 +157,14 @@ int init_module(void) {
 }
 
 void cleanup_module(void) {
+  // Variable Declaration
+  int i;
+
   printk("%s: cleanup\n", MODNAME);
 
   // System Call Cleanup
   unprotect_memory();
-  for (int i = 0; i < HACKED_ENTRIES; i++) {
+  for (i = 0; i < HACKED_ENTRIES; i++) {
     ((unsigned long *)the_syscall_table)[restore[i]] = the_ni_syscall;
   }
   protect_memory();
