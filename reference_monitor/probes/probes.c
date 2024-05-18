@@ -1,4 +1,5 @@
 #include <asm/ptrace.h>
+#include <linux/fs.h>
 #include <linux/kprobes.h>
 #include <linux/printk.h>
 
@@ -6,124 +7,131 @@
 #include "probes.h"
 
 // File create/edit
-static struct kretprobe do_filp_open_probe;
+struct kretprobe vfs_open_probe;
 
 // File delete
-static struct kretprobe do_unlinkat_probe;
+struct kretprobe vfs_unlink_probe;
 
 // File link
-static struct kretprobe do_linkat_probe;
+struct kretprobe vfs_link_probe;
 
 // Directory create
-static struct kretprobe do_mkdirat_probe;
+struct kretprobe vfs_mkdir_probe;
 
 // Directory delete
-static struct kretprobe do_rmdir_probe;
+struct kretprobe vfs_rmdir_probe;
 
 // Directory edit (file move)
-static struct kretprobe do_renameat2_probe;
+struct kretprobe vfs_rename_probe;
 
 // Symbolic Link
-static struct kretprobe do_symlinkat_probe;
+struct kretprobe vfs_symlink_probe;
 
-static int do_filp_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
-static int do_filp_open_probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+// NOTE: the post handler is executed only if the entry handler returns 0
+// so probably a single post handler can be used for all the probes,
+// executed only if the probe has filtered the call; it should set the return
+// value of the syscall to a error value (e.g. EACCES)
 
-static int do_unlinkat_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
-static int do_unlinkat_probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+static int vfs_open_probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
 
-static int do_linkat_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
-static int do_linkat_probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+static int vfs_unlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+static int vfs_unlink_probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
 
-static int do_mkdirat_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
-static int do_mkdirat_probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+static int vfs_link_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+static int vfs_link_probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
 
-static int do_rmdir_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
-static int do_rmdir_probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+static int vfs_mkdir_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
+static int vfs_mkdir_probe_post_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
 
-static int do_renameat2_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
-static int do_renameat2_probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+static int vfs_rmdir_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
+static int vfs_rmdir_probe_post_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
 
-static int do_symlinkat_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
-static int do_symlinkat_probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+static int vfs_rename_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
+static int vfs_rename_probe_post_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
+
+static int vfs_symlink_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
+static int vfs_symlink_probe_post_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
 
 void probes_init(void) {
-  do_filp_open_probe.kp.symbol_name = "do_filp_open";
-  do_filp_open_probe.entry_handler = (kretprobe_handler_t)do_filp_open_probe_entry_handler;
-  do_filp_open_probe.handler = (kretprobe_handler_t)do_filp_open_probe_post_handler;
-  do_filp_open_probe.maxactive = -1;
+  vfs_open_probe.kp.symbol_name = "vfs_open";
+  vfs_open_probe.entry_handler = (kretprobe_handler_t)vfs_open_probe_entry_handler;
+  vfs_open_probe.handler = (kretprobe_handler_t)vfs_open_probe_post_handler;
+  vfs_open_probe.maxactive = -1;
 
-  do_unlinkat_probe.kp.symbol_name = "do_unlinkat";
-  do_unlinkat_probe.entry_handler = (kretprobe_handler_t)do_unlinkat_probe_entry_handler;
-  do_unlinkat_probe.handler = (kretprobe_handler_t)do_unlinkat_probe_post_handler;
-  do_unlinkat_probe.maxactive = -1;
+  vfs_unlink_probe.kp.symbol_name = "vfs_unlink";
+  vfs_unlink_probe.entry_handler = (kretprobe_handler_t)vfs_unlink_probe_entry_handler;
+  vfs_unlink_probe.handler = (kretprobe_handler_t)vfs_unlink_probe_post_handler;
+  vfs_unlink_probe.maxactive = -1;
 
-  do_linkat_probe.kp.symbol_name = "do_linkat";
-  do_linkat_probe.entry_handler = (kretprobe_handler_t)do_linkat_probe_entry_handler;
-  do_linkat_probe.handler = (kretprobe_handler_t)do_linkat_probe_post_handler;
-  do_linkat_probe.maxactive = -1;
+  vfs_link_probe.kp.symbol_name = "vfs_link";
+  vfs_link_probe.entry_handler = (kretprobe_handler_t)vfs_link_probe_entry_handler;
+  vfs_link_probe.handler = (kretprobe_handler_t)vfs_link_probe_post_handler;
+  vfs_link_probe.maxactive = -1;
 
-  do_mkdirat_probe.kp.symbol_name = "do_mkdirat";
-  do_mkdirat_probe.entry_handler = (kretprobe_handler_t)do_mkdirat_probe_entry_handler;
-  do_mkdirat_probe.handler = (kretprobe_handler_t)do_mkdirat_probe_post_handler;
-  do_mkdirat_probe.maxactive = -1;
+  vfs_mkdir_probe.kp.symbol_name = "vfs_mkdir";
+  vfs_mkdir_probe.entry_handler = (kretprobe_handler_t)vfs_mkdir_probe_entry_handler;
+  vfs_mkdir_probe.handler = (kretprobe_handler_t)vfs_mkdir_probe_post_handler;
+  vfs_mkdir_probe.maxactive = -1;
 
-  do_rmdir_probe.kp.symbol_name = "do_rmdir";
-  do_rmdir_probe.entry_handler = (kretprobe_handler_t)do_rmdir_probe_entry_handler;
-  do_rmdir_probe.handler = (kretprobe_handler_t)do_rmdir_probe_post_handler;
-  do_rmdir_probe.maxactive = -1;
+  vfs_rmdir_probe.kp.symbol_name = "vfs_rmdir";
+  vfs_rmdir_probe.entry_handler = (kretprobe_handler_t)vfs_rmdir_probe_entry_handler;
+  vfs_rmdir_probe.handler = (kretprobe_handler_t)vfs_rmdir_probe_post_handler;
+  vfs_rmdir_probe.maxactive = -1;
 
-  do_renameat2_probe.kp.symbol_name = "do_renameat2";
-  do_renameat2_probe.entry_handler = (kretprobe_handler_t)do_renameat2_probe_entry_handler;
-  do_renameat2_probe.handler = (kretprobe_handler_t)do_renameat2_probe_post_handler;
-  do_renameat2_probe.maxactive = -1;
+  vfs_rename_probe.kp.symbol_name = "vfs_rename";
+  vfs_rename_probe.entry_handler = (kretprobe_handler_t)vfs_rename_probe_entry_handler;
+  vfs_rename_probe.handler = (kretprobe_handler_t)vfs_rename_probe_post_handler;
+  vfs_rename_probe.maxactive = -1;
 
-  do_symlinkat_probe.kp.symbol_name = "do_symlinkat";
-  do_symlinkat_probe.entry_handler = (kretprobe_handler_t)do_symlinkat_probe_entry_handler;
-  do_symlinkat_probe.handler = (kretprobe_handler_t)do_symlinkat_probe_post_handler;
-  do_symlinkat_probe.maxactive = -1;
+  vfs_symlink_probe.kp.symbol_name = "vfs_symlink";
+  vfs_symlink_probe.entry_handler = (kretprobe_handler_t)vfs_symlink_probe_entry_handler;
+  vfs_symlink_probe.handler = (kretprobe_handler_t)vfs_symlink_probe_post_handler;
+  vfs_symlink_probe.maxactive = -1;
 }
 
 int probes_register(void) {
-  int ret;
+  int ret = 0;
 
-  if ((ret = register_kretprobe(&do_filp_open_probe)) < 0) {
-    printk("%s: probes registration failed at do_filp_open: %d\n", MODNAME, ret);
+  if ((ret = register_kretprobe(&vfs_open_probe)) < 0) {
+    printk("%s: probes registration failed at vfs_open: %d\n", MODNAME, ret);
     return ret;
   }
-  if ((ret = register_kretprobe(&do_unlinkat_probe)) < 0) {
-    printk("%s: probes registration failed at do_unlinkat: %d\n", MODNAME, ret);
+  if ((ret = register_kretprobe(&vfs_unlink_probe)) < 0) {
+    printk("%s: probes registration failed at vfs_unlink: %d\n", MODNAME, ret);
     return ret;
   }
-  if ((ret = register_kretprobe(&do_linkat_probe)) < 0) {
-    printk("%s: probes registration failed at do_linkat: %d\n", MODNAME, ret);
+  if ((ret = register_kretprobe(&vfs_link_probe)) < 0) {
+    printk("%s: probes registration failed at vfs_link: %d\n", MODNAME, ret);
     return ret;
   }
-  if ((ret = register_kretprobe(&do_mkdirat_probe)) < 0) {
-    printk("%s: probes registration failed at do_mkdirat: %d\n", MODNAME, ret);
+  if ((ret = register_kretprobe(&vfs_mkdir_probe)) < 0) {
+    printk("%s: probes registration failed at vfs_mkdir: %d\n", MODNAME, ret);
     return ret;
   }
-  if ((ret = register_kretprobe(&do_rmdir_probe)) < 0) {
-    printk("%s: probes registration failed at do_rmdir: %d\n", MODNAME, ret);
+  if ((ret = register_kretprobe(&vfs_rmdir_probe)) < 0) {
+    printk("%s: probes registration failed at vfs_rmdir: %d\n", MODNAME, ret);
     return ret;
   }
-  if ((ret = register_kretprobe(&do_renameat2_probe)) < 0) {
-    printk("%s: probes registration failed at do_renameat2: %d\n", MODNAME, ret);
+  if ((ret = register_kretprobe(&vfs_rename_probe)) < 0) {
+    printk("%s: probes registration failed at vfs_rename: %d\n", MODNAME, ret);
     return ret;
   }
-  if ((ret = register_kretprobe(&do_symlinkat_probe)) < 0) {
-    printk("%s: probes registration failed at do_symlinkat: %d\n", MODNAME, ret);
+  if ((ret = register_kretprobe(&vfs_symlink_probe)) < 0) {
+    printk("%s: probes registration failed at vfs_symlink: %d\n", MODNAME, ret);
     return ret;
   }
-  return 0;
+  printk("%s: correctly registered probes\n", MODNAME);
+  return ret;
 }
 
 void probes_unregister(void) {
-  unregister_kretprobe(&do_filp_open_probe);
-  unregister_kretprobe(&do_unlinkat_probe);
-  unregister_kretprobe(&do_linkat_probe);
-  unregister_kretprobe(&do_mkdirat_probe);
-  unregister_kretprobe(&do_rmdir_probe);
-  unregister_kretprobe(&do_renameat2_probe);
-  unregister_kretprobe(&do_symlinkat_probe);
+  unregister_kretprobe(&vfs_open_probe);
+  unregister_kretprobe(&vfs_unlink_probe);
+  unregister_kretprobe(&vfs_link_probe);
+  unregister_kretprobe(&vfs_mkdir_probe);
+  unregister_kretprobe(&vfs_rmdir_probe);
+  unregister_kretprobe(&vfs_rename_probe);
+  unregister_kretprobe(&vfs_symlink_probe);
+  printk("%s: correctly unregistered probes\n", MODNAME);
 }

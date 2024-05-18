@@ -1,3 +1,4 @@
+#include "probes/probes.h"
 #define EXPORT_SYMTAB
 
 #include <asm/apic.h>
@@ -39,72 +40,10 @@ unsigned long new_sys_call_array[] = {0x0, 0x0, 0x0, 0x0};
 #define HACKED_ENTRIES (int)(sizeof(new_sys_call_array) / sizeof(unsigned long))
 int restore[HACKED_ENTRIES] = {[0 ...(HACKED_ENTRIES - 1)] = -1};
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-__SYSCALL_DEFINEx(2, _reference_monitor_change_password, const char *, password, const char *, old_password) {
-#else
-asmlinkage long sys_reference_monitor_change_password(const char *password, const char *old_password) {
-#endif
-  printk(KERN_INFO "%s: message priority %s\n", MODNAME, KERN_INFO);
-  return 0;
-}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-long sys_reference_monitor_change_password = (unsigned long)__x64_sys_reference_monitor_change_password;
-#else
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-__SYSCALL_DEFINEx(2, _reference_monitor_set_state, const char *, password, int, state) {
-#else
-asmlinkage long sys_reference_monitor_set_state(const char *password, int state) {
-#endif
-  printk(KERN_INFO "%s: message priority %s\n", MODNAME, KERN_INFO);
-  return 0;
-}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-long sys_reference_monitor_set_state = (unsigned long)__x64_sys_reference_monitor_set_state;
-#else
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-__SYSCALL_DEFINEx(2, _reference_monitor_add_path, const char *, password, const char *, path) {
-#else
-asmlinkage long sys_reference_monitor_add_path(const char *password, const char *path) {
-#endif
-  printk(KERN_INFO "%s: message priority %s\n", MODNAME, KERN_INFO);
-  return 0;
-}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-long sys_reference_monitor_add_path = (unsigned long)__x64_sys_reference_monitor_add_path;
-#else
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-__SYSCALL_DEFINEx(2, _reference_monitor_delete_path, const char *, password, const char *, path) {
-#else
-asmlinkage long sys_reference_monitor_delete_path(const char *password, const char *path) {
-#endif
-  printk(KERN_INFO "%s: message priority %s\n", MODNAME, KERN_INFO);
-  return 0;
-}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-long sys_reference_monitor_delete_path = (unsigned long)__x64_sys_reference_monitor_delete_path;
-#else
-#endif
-
-struct reference_monitor_path {
-  char *path;
-  struct list_head list;
-};
-
-struct reference_monitor {
-  int state : 2;                       // Using only 2 bits for the state (4 possible values)
-  unsigned char *password_hash;        // Reference Monitor Password Hash
-  struct reference_monitor_path paths; // Paths to monitor, in a linked list
-};
+extern long sys_reference_monitor_change_password;
+extern long sys_reference_monitor_set_state;
+extern long sys_reference_monitor_add_path;
+extern long sys_reference_monitor_delete_path;
 
 struct reference_monitor refmon = {0};
 
@@ -151,6 +90,8 @@ int init_module(void) {
     return -ENOMEM;
   }
   INIT_LIST_HEAD(&refmon.paths.list);
+
+  probes_init();
   printk("%s: correctly initialized\n", MODNAME);
 
   return 0;
@@ -171,6 +112,9 @@ void cleanup_module(void) {
 
   // Reference Monitor Cleanup
   kfree(refmon.password_hash);
+  // Unregister probes if they were enabled
+  if (refmon.state == REFMON_STATE_ON)
+    probes_unregister();
 
   printk("%s: sys-call table restored to its original content\n", MODNAME);
 }

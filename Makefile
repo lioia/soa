@@ -6,6 +6,10 @@ all:
 	@echo "Building Reference Monitor"
 	@cd reference_monitor && $(MAKE) all
 
+user:
+	@echo "Building user-space application"
+	@cd reference_monitor && $(MAKE) reference_monitor_user
+
 clean:
 	@cd libs/sys_call_table_discoverer && $(MAKE) clean
 	@cd reference_monitor && $(MAKE) clean

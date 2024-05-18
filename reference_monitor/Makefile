@@ -1,5 +1,5 @@
 obj-m += the_reference_monitor.o
-the_reference_monitor-objs += reference_monitor.o libs/scth.o utils/crypto.o
+the_reference_monitor-objs += reference_monitor.o libs/scth.o utils/crypto.o probes/probes.o utils/syscall.o
 
 all: reference_monitor_module reference_monitor_user
 
