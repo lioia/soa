@@ -1,8 +1,9 @@
-#ifndef PASSWORD_H
+#ifndef CRYPTO_H
+#define CRYPTO_H
 
-#define SALT "reference_monitor_salt"
+#include <linux/types.h>
 
 char *crypt_data(const unsigned char *data);
-int check_hash(const unsigned char *data, const unsigned char *hashed);
+bool check_hash(const unsigned char *data, const unsigned char *hashed);
 
-#endif // !PASSWORD_H
+#endif // !CRYPTO_H

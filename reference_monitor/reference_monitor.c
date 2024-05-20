@@ -1,4 +1,3 @@
-#include "probes/probes.h"
 #define EXPORT_SYMTAB
 
 #include <asm/apic.h>
@@ -25,6 +24,7 @@
 #include <linux/vmalloc.h>
 
 #include "libs/scth.h"
+#include "probes/probes.h"
 #include "reference_monitor.h"
 #include "utils/crypto.h"
 
@@ -89,7 +89,7 @@ int init_module(void) {
     printk(KERN_ERR "failed to crypt_data for default password\n");
     return -ENOMEM;
   }
-  INIT_LIST_HEAD(&refmon.paths.list);
+  INIT_LIST_HEAD(&refmon.list);
 
   probes_init();
   printk("%s: correctly initialized\n", MODNAME);

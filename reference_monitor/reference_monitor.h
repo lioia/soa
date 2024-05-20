@@ -11,16 +11,17 @@
 #include <linux/types.h>
 
 #define MODNAME "REFERENCE_MONITOR"
+#define PASSWORD_MAX_LEN 128
 
 struct reference_monitor_path {
   char *path;
-  struct list_head list;
+  struct list_head next;
 };
 
 struct reference_monitor {
-  int state : 2;                       // Using only 2 bits for the state (4 possible values)
-  unsigned char *password_hash;        // Reference Monitor Password Hash
-  struct reference_monitor_path paths; // Paths to monitor, in a linked list
+  int state : 2;                // Using only 2 bits for the state (4 possible values)
+  unsigned char *password_hash; // Reference Monitor Password Hash
+  struct list_head list;        // Paths to monitor, in a linked list
 };
 #endif // !__KERNEL__
 
