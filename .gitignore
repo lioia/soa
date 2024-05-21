@@ -12,4 +12,5 @@ modules*
 the_reference_monitor*
 *.o
 *.o.cmd
+user
 !user.c

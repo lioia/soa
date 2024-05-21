@@ -25,7 +25,7 @@ asmlinkage long sys_reference_monitor_change_password(const char *password, cons
   char *buffer = NULL;
   long ret = 0;
 
-  printk(KERN_INFO "%s: change_password %s\n", MODNAME, KERN_INFO);
+  printk(KERN_INFO "%s: change_password\n", MODNAME);
   if ((ret = is_root_and_correct_password(old_password)) < 0)
     goto exit;
 
@@ -82,7 +82,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   struct reference_monitor_path *node = NULL;
   long ret = 0;
 
-  printk(KERN_INFO "%s: add_path %s\n", MODNAME, KERN_INFO);
+  printk(KERN_INFO "%s: add_path\n", MODNAME);
   if ((ret = is_root_and_correct_password(password)) < 0)
     return ret;
 
@@ -136,7 +136,7 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
   struct reference_monitor_path *node = NULL;
   long ret = 0;
 
-  printk(KERN_INFO "%s: delete_path %s\n", MODNAME, KERN_INFO);
+  printk(KERN_INFO "%s: delete_path\n", MODNAME);
   if ((ret = is_root_and_correct_password(password)) < 0)
     return ret;
 
