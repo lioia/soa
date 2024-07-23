@@ -49,6 +49,7 @@ exit:
   return path;
 }
 
+// Check if effective user id is root
 bool is_euid_root(void) {
   const struct cred *cur_cred;
 
@@ -64,9 +65,11 @@ int is_root_and_correct_password(const char *password) {
   char *buffer = NULL;
   int ret = 0;
 
+  // Check if root
   if (!is_euid_root())
     return -EPERM;
 
+  // Get free page
   buffer = kmalloc(sizeof(*buffer) * PASSWORD_MAX_LEN, GFP_ATOMIC);
   if (buffer == NULL) {
     printk("%s: error kmalloc in syscall change_password\n", MODNAME);
@@ -74,12 +77,14 @@ int is_root_and_correct_password(const char *password) {
     goto exit;
   }
 
+  // Copy provided password from user into buffer
   if (copy_from_user(buffer, password, PASSWORD_MAX_LEN) < 0) {
     printk("%s: error copy_from_user (old_password) in syscall change_password\n", MODNAME);
     ret = -EINVAL;
     goto exit;
   }
 
+  // Check if the hash differs
   if (!check_hash(buffer, refmon.password_hash)) {
     printk("%s: check_hash failed in syscall change_password", MODNAME);
     ret = -EPERM;
@@ -91,6 +96,7 @@ exit:
   return ret;
 }
 
+// Search for path in the rcu list
 struct reference_monitor_path *search_for_path_in_list(const char *path) {
   bool found = false;
   struct reference_monitor_path *node = NULL;

@@ -27,14 +27,17 @@ asmlinkage long sys_reference_monitor_change_password(const char *password, cons
   long ret = 0;
 
   printk(KERN_INFO "%s: change_password\n", MODNAME);
+  // Check for root and if provided password (copy is inside the function) is correct
   if ((ret = is_root_and_correct_password(old_password)) < 0)
     goto exit;
 
+  // Copy new password into a buffer
   if (copy_from_user(buffer, password, PASSWORD_MAX_LEN) < 0) {
     printk("%s: error copy_from_user (password) in syscall change_password\n", MODNAME);
     ret = -EINVAL;
     goto exit;
   }
+  // Update the password hash
   refmon.password_hash = crypt_data(buffer);
 
 exit:
@@ -59,8 +62,10 @@ asmlinkage long sys_reference_monitor_set_state(const char *password, int state)
   if ((ret = is_root_and_correct_password(password)) < 0)
     return ret;
 
+  // Update state TODO: adhere to specs
   refmon.state = state;
 
+  // Register/unregister probes based on the state TODO: adhere to specs
   if (state == REFMON_STATE_ON)
     return probes_register();
   else if (state == REFMON_STATE_OFF)
@@ -84,45 +89,56 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   long ret = 0;
 
   printk(KERN_INFO "%s: add_path\n", MODNAME);
+  // Check if root and provided password is correct
   if ((ret = is_root_and_correct_password(password)) < 0)
     return ret;
 
+  // Check if it can be reconfigures
   if (refmon.state != REFMON_STATE_REC_ON) {
     printk("%s: state does not allow to reconfigure\n", MODNAME);
     return -EPERM;
   }
 
+  // Get a page to store the password
   buffer = (char *)__get_free_page(GFP_ATOMIC);
   if (buffer == NULL) {
     printk("%s: error get_free_page in syscall add_path\n", MODNAME);
     ret = -ENOMEM;
     goto exit;
   }
+  // Copy provided path from user to buffer
   if (copy_from_user(buffer, path, PATH_MAX) < 0) {
-    printk("%s: error copy_from_user (old_password) in syscall change_password\n", MODNAME);
+    printk("%s: error copy_from_user (old_password) in syscall add_path\n", MODNAME);
     ret = -EINVAL;
     goto exit;
   }
+  // Search for node in the rcu list
   node = search_for_path_in_list(buffer);
+  // Node found, so the path is already in the list
   if (node != NULL) {
-    printk("%s: syscall change_password node already in list\n", MODNAME);
+    printk("%s: syscall add_path node already in list\n", MODNAME);
     goto exit;
   }
+  // Node not found; creating new one
   node = kmalloc(sizeof(*node), GFP_ATOMIC);
   if (node != NULL) {
     printk("%s: error kmalloc in syscall add_path\n", MODNAME);
     ret = -ENOMEM;
     goto exit;
   }
+  // Setting the path to the buffer
   node->path = buffer;
 
+  // Adding the node in an atomic way to the rcu list
   spin_lock(&refmon.lock);
   list_add_rcu(&node->next, &refmon.list);
   spin_unlock(&refmon.lock);
+  goto exit_no_free;
 
-exit:
+exit: // On error or node found
   if (buffer)
     free_page((unsigned long)buffer);
+exit_no_free: // On correct insertion
   return ret;
 }
 
@@ -141,26 +157,32 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
   long ret = 0;
 
   printk(KERN_INFO "%s: delete_path\n", MODNAME);
+  // Check if root and password provided is correct
   if ((ret = is_root_and_correct_password(password)) < 0)
     return ret;
 
+  // Check if it can be reconfigured
   if (refmon.state != REFMON_STATE_REC_ON) {
     printk("%s: state does not allow to reconfigure\n", MODNAME);
     return -EPERM;
   }
+  // Get new buffer
   buffer = (char *)__get_free_page(GFP_ATOMIC);
   if (buffer == NULL) {
     printk("%s: error get_free_page in syscall add_path\n", MODNAME);
     ret = -ENOMEM;
     goto exit;
   }
+  // Copy provided path into buffer
   if (copy_from_user(buffer, path, PATH_MAX) < 0) {
     printk("%s: error copy_from_user (old_password) in syscall change_password\n", MODNAME);
     ret = -EINVAL;
     goto exit;
   }
+  // Search for node in the rcu list
   node = search_for_path_in_list(buffer);
 
+  // If found, remove from the list
   if (node) {
     spin_lock(&refmon.lock);
     list_del_rcu(&node->next);
