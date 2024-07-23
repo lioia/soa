@@ -4,6 +4,7 @@
 #include <linux/gfp.h>
 #include <linux/limits.h>
 #include <linux/printk.h>
+#include <linux/rcupdate.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>
@@ -16,7 +17,8 @@
 extern struct reference_monitor refmon;
 
 char *get_complete_path_from_dentry(struct dentry *dentry) {
-  char *buf, *path;
+  char *buf, *ret, *path = NULL;
+  int len = 0;
 
   // Allocate buffer as a page (PATH_MAX is 4096)
   buf = (char *)__get_free_page(GFP_ATOMIC);
@@ -26,13 +28,24 @@ char *get_complete_path_from_dentry(struct dentry *dentry) {
   }
 
   // Get complete path in ret (ret is the starting point in buf of the path)
-  path = dentry_path_raw(dentry, buf, PATH_MAX);
+  ret = dentry_path_raw(dentry, buf, PATH_MAX);
   if (IS_ERR(path)) {
     printk("%s error calling dentry_path_raw in dentry_complete_path (%ld)\n", MODNAME, PTR_ERR(path));
     goto exit;
   }
+  // Allocate buffer  for this path
+  len = strlen(path);
+  path = kmalloc(sizeof(*path) * len, GFP_ATOMIC);
+  if (path != NULL) {
+    printk("%s error calling kmalloc in dentry_complete_path (%ld)\n", MODNAME, PTR_ERR(path));
+    goto exit;
+  }
+  // Copy the string from the buffer to path
+  strncpy(path, ret, len);
 exit:
-  free_page((unsigned long)buf);
+  if (buf)
+    free_page((unsigned long)buf);
+  // NOTE: freeing ret should not be necessary as it is just a pointer to memory allocated in buf
   return path;
 }
 
@@ -76,4 +89,18 @@ exit:
   if (buffer)
     kfree(buffer);
   return ret;
+}
+
+struct reference_monitor_path *search_for_path_in_list(const char *path) {
+  bool found = false;
+  struct reference_monitor_path *node = NULL;
+  rcu_read_lock();
+  list_for_each_entry_rcu(node, &refmon.list, next) {
+    if (!strcmp(node->path, path)) {
+      found = true;
+      break;
+    }
+  }
+  rcu_read_unlock();
+  return found ? node : NULL;
 }

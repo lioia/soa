@@ -8,6 +8,7 @@
 
 // Only visible when compiling in kernel-space
 #ifdef __KERNEL__
+#include <linux/spinlock_types.h>
 #include <linux/types.h>
 
 #define MODNAME "REFERENCE_MONITOR"
@@ -21,6 +22,7 @@ struct reference_monitor_path {
 struct reference_monitor {
   int state : 2;                // Using only 2 bits for the state (4 possible values)
   unsigned char *password_hash; // Reference Monitor Password Hash
+  spinlock_t lock;              // Lock for write operations on RCU list (add/delete)
   struct list_head list;        // Paths to monitor, in a linked list
 };
 #endif // !__KERNEL__

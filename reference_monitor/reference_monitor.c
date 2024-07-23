@@ -17,6 +17,7 @@
 #include <linux/printk.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/syscalls.h>
 #include <linux/time.h>
@@ -89,6 +90,7 @@ int init_module(void) {
     printk(KERN_ERR "failed to crypt_data for default password\n");
     return -ENOMEM;
   }
+  spin_lock_init(&refmon.lock);
   INIT_LIST_HEAD(&refmon.list);
 
   probes_init();

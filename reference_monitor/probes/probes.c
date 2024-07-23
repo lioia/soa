@@ -4,6 +4,7 @@
 #include <linux/printk.h>
 #include <linux/rculist.h>
 #include <linux/rcupdate.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 
 #include "../reference_monitor.h"
@@ -34,9 +35,9 @@ struct kretprobe vfs_rename_probe;
 struct kretprobe vfs_symlink_probe;
 
 // NOTE: the post handler is executed only if the entry handler returns 0
-// so probably a single post handler can be used for all the probes,
-// executed only if the probe has filtered the call; it should set the return
-// value of the syscall to a error value (e.g. EACCES)
+// so a single post handler can is used for all the probes,
+// executed only if the probe has filtered the call
+// it sets the return value of the syscall to an error value (EACCES)
 static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
   regs_set_return_value(regs, -EACCES);
   return 0;
@@ -44,20 +45,22 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
 
 // int vfs_open(const struct path *path, struct file *file)
 static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  struct path *path = (struct path *)regs->di;
-  // struct file *file = (struct file *)regs->si;
+  struct path *di_path = (struct path *)regs->di;
+  int ret = 0;
+  char *path = get_complete_path_from_dentry(di_path->dentry);
 
-  char *complete_path = get_complete_path_from_dentry(path->dentry);
-  struct reference_monitor_path *entry;
-  rcu_read_lock();
-  list_for_each_entry_rcu(entry, &refmon.list, next) {
-    if (!strcmp(entry->path, complete_path)) {
-      printk("%s: found entry in RCU\n", MODNAME);
-      return 0;
-    }
+  struct reference_monitor_path *entry = search_for_path_in_list(path);
+  if (entry == NULL) {
+    ret = 1;
+    goto exit;
   }
-  rcu_read_unlock();
-  return 1;
+
+  // TODO: deferred work (write to fs, calculate hash)
+
+exit:
+  if (path)
+    kfree(path);
+  return ret;
 }
 
 static int vfs_unlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }

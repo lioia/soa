@@ -3,7 +3,9 @@
 #include <linux/gfp.h>
 #include <linux/limits.h>
 #include <linux/printk.h>
+#include <linux/rculist.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
 #include <linux/uidgid.h>
@@ -12,7 +14,6 @@
 #include "../probes/probes.h"
 #include "../reference_monitor.h"
 #include "crypto.h"
-#include "linux/rculist.h"
 #include "utils.h"
 
 extern struct reference_monitor refmon;
@@ -102,7 +103,11 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
     ret = -EINVAL;
     goto exit;
   }
-  // TODO: check if it is already in the list
+  node = search_for_path_in_list(buffer);
+  if (node != NULL) {
+    printk("%s: syscall change_password node already in list\n", MODNAME);
+    goto exit;
+  }
   node = kmalloc(sizeof(*node), GFP_ATOMIC);
   if (node != NULL) {
     printk("%s: error kmalloc in syscall add_path\n", MODNAME);
@@ -111,14 +116,13 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   }
   node->path = buffer;
 
-  // TODO: maybe a spinlock is necessary
+  spin_lock(&refmon.lock);
   list_add_rcu(&node->next, &refmon.list);
+  spin_unlock(&refmon.lock);
 
 exit:
   if (buffer)
     free_page((unsigned long)buffer);
-  if (node)
-    kfree(node);
   return ret;
 }
 
@@ -155,16 +159,12 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
     ret = -EINVAL;
     goto exit;
   }
-  rcu_read_lock();
-  list_for_each_entry_rcu(node, &refmon.list, next) {
-    if (!strcmp(node->path, buffer))
-      break;
-  }
-  rcu_read_unlock();
+  node = search_for_path_in_list(buffer);
 
   if (node) {
-    // TODO: lock for deletion
+    spin_lock(&refmon.lock);
     list_del_rcu(&node->next);
+    spin_unlock(&refmon.lock);
   }
 
 exit:
