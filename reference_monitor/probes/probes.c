@@ -11,6 +11,26 @@
 #include "../utils/utils.h"
 #include "probes.h"
 
+// Macro for creating a probe from the function name
+// do {} while(0) is needed to ensure that it runs as a single statement
+#define CREATE_PROBE(func_name)                                                                                        \
+  do {                                                                                                                 \
+    func_name##_probe.kp.symbol_name = #func_name;                                                                     \
+    func_name##_probe.entry_handler = (kretprobe_handler_t)func_name##_probe_entry_handler;                            \
+    func_name##_probe.handler = (kretprobe_handler_t)probe_post_handler;                                               \
+    func_name##_probe.maxactive = -1;                                                                                  \
+  } while (0)
+
+// Macro for registering a probe from the function name
+#define REGISTER_PROBE(func_name)                                                                                      \
+  do {                                                                                                                 \
+    int ret;                                                                                                           \
+    if ((ret = register_kretprobe(&func_name##_probe)) < 0) {                                                          \
+      printk(KERN_ERR "%s: probe registration failed at %s: %d\n", MODNAME, #func_name, ret);                          \
+      return ret;                                                                                                      \
+    }                                                                                                                  \
+  } while (0)
+
 extern struct reference_monitor refmon;
 
 // File create/edit
@@ -47,9 +67,12 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
 static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
   struct path *di_path = (struct path *)regs->di;
   int ret = 0;
+  // Get path from dentry
   char *path = get_complete_path_from_dentry(di_path->dentry);
 
+  // Search for the path in the rcu list
   struct reference_monitor_path *entry = search_for_path_in_list(path);
+  // No entry found, returning 1 so the post handler is not executed
   if (entry == NULL) {
     ret = 1;
     goto exit;
@@ -79,40 +102,13 @@ static int vfs_rename_probe_entry_handler(struct kretprobe_instance *ri, struct 
 static int vfs_symlink_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
 
 void probes_init(void) {
-  vfs_open_probe.kp.symbol_name = "vfs_open";
-  vfs_open_probe.entry_handler = (kretprobe_handler_t)vfs_open_probe_entry_handler;
-  vfs_open_probe.handler = (kretprobe_handler_t)probe_post_handler;
-  vfs_open_probe.maxactive = -1;
-
-  vfs_unlink_probe.kp.symbol_name = "vfs_unlink";
-  vfs_unlink_probe.entry_handler = (kretprobe_handler_t)vfs_unlink_probe_entry_handler;
-  vfs_unlink_probe.handler = (kretprobe_handler_t)probe_post_handler;
-  vfs_unlink_probe.maxactive = -1;
-
-  vfs_link_probe.kp.symbol_name = "vfs_link";
-  vfs_link_probe.entry_handler = (kretprobe_handler_t)vfs_link_probe_entry_handler;
-  vfs_link_probe.handler = (kretprobe_handler_t)probe_post_handler;
-  vfs_link_probe.maxactive = -1;
-
-  vfs_mkdir_probe.kp.symbol_name = "vfs_mkdir";
-  vfs_mkdir_probe.entry_handler = (kretprobe_handler_t)vfs_mkdir_probe_entry_handler;
-  vfs_mkdir_probe.handler = (kretprobe_handler_t)probe_post_handler;
-  vfs_mkdir_probe.maxactive = -1;
-
-  vfs_rmdir_probe.kp.symbol_name = "vfs_rmdir";
-  vfs_rmdir_probe.entry_handler = (kretprobe_handler_t)vfs_rmdir_probe_entry_handler;
-  vfs_rmdir_probe.handler = (kretprobe_handler_t)probe_post_handler;
-  vfs_rmdir_probe.maxactive = -1;
-
-  vfs_rename_probe.kp.symbol_name = "vfs_rename";
-  vfs_rename_probe.entry_handler = (kretprobe_handler_t)vfs_rename_probe_entry_handler;
-  vfs_rename_probe.handler = (kretprobe_handler_t)probe_post_handler;
-  vfs_rename_probe.maxactive = -1;
-
-  vfs_symlink_probe.kp.symbol_name = "vfs_symlink";
-  vfs_symlink_probe.entry_handler = (kretprobe_handler_t)vfs_symlink_probe_entry_handler;
-  vfs_symlink_probe.handler = (kretprobe_handler_t)probe_post_handler;
-  vfs_symlink_probe.maxactive = -1;
+  CREATE_PROBE(vfs_open);
+  CREATE_PROBE(vfs_unlink);
+  CREATE_PROBE(vfs_link);
+  CREATE_PROBE(vfs_mkdir);
+  CREATE_PROBE(vfs_rmdir);
+  CREATE_PROBE(vfs_rename);
+  CREATE_PROBE(vfs_symlink);
 
   printk("%s: initialized probe\n", MODNAME);
 }
@@ -120,34 +116,13 @@ void probes_init(void) {
 int probes_register(void) {
   int ret = 0;
 
-  if ((ret = register_kretprobe(&vfs_open_probe)) < 0) {
-    printk("%s: probes registration failed at vfs_open: %d\n", MODNAME, ret);
-    return ret;
-  }
-  if ((ret = register_kretprobe(&vfs_unlink_probe)) < 0) {
-    printk("%s: probes registration failed at vfs_unlink: %d\n", MODNAME, ret);
-    return ret;
-  }
-  if ((ret = register_kretprobe(&vfs_link_probe)) < 0) {
-    printk("%s: probes registration failed at vfs_link: %d\n", MODNAME, ret);
-    return ret;
-  }
-  if ((ret = register_kretprobe(&vfs_mkdir_probe)) < 0) {
-    printk("%s: probes registration failed at vfs_mkdir: %d\n", MODNAME, ret);
-    return ret;
-  }
-  if ((ret = register_kretprobe(&vfs_rmdir_probe)) < 0) {
-    printk("%s: probes registration failed at vfs_rmdir: %d\n", MODNAME, ret);
-    return ret;
-  }
-  if ((ret = register_kretprobe(&vfs_rename_probe)) < 0) {
-    printk("%s: probes registration failed at vfs_rename: %d\n", MODNAME, ret);
-    return ret;
-  }
-  if ((ret = register_kretprobe(&vfs_symlink_probe)) < 0) {
-    printk("%s: probes registration failed at vfs_symlink: %d\n", MODNAME, ret);
-    return ret;
-  }
+  REGISTER_PROBE(vfs_open);
+  REGISTER_PROBE(vfs_unlink);
+  REGISTER_PROBE(vfs_link);
+  REGISTER_PROBE(vfs_mkdir);
+  REGISTER_PROBE(vfs_rmdir);
+  REGISTER_PROBE(vfs_rename);
+  REGISTER_PROBE(vfs_symlink);
   printk("%s: correctly registered probes\n", MODNAME);
   return ret;
 }
