@@ -17,34 +17,35 @@
 extern struct reference_monitor refmon;
 
 char *get_complete_path_from_dentry(struct dentry *dentry) {
-  char *buf, *ret, *path = NULL;
+  char *buffer, *raw = NULL, *path;
   int len = 0;
 
   // Allocate buffer as a page (PATH_MAX is 4096)
-  buf = (char *)__get_free_page(GFP_ATOMIC);
-  if (buf == NULL) {
-    printk("%s: error calling get_free_page in dentry_complete_path\n", MODNAME);
+  buffer = (char *)__get_free_page(GFP_ATOMIC);
+  if (buffer == NULL) {
+    pr_err("%s: get_free_page failed for buffer in get_complete_path_from_dentry\n", MODNAME);
     return NULL;
   }
 
   // Get complete path in ret (ret is the starting point in buf of the path)
-  ret = dentry_path_raw(dentry, buf, PATH_MAX);
-  if (IS_ERR(path)) {
-    printk("%s error calling dentry_path_raw in dentry_complete_path (%ld)\n", MODNAME, PTR_ERR(path));
+  raw = dentry_path_raw(dentry, buffer, PATH_MAX);
+  if (IS_ERR(raw)) {
+    pr_err("%s: dentry_path_raw failed in get_complete_path_from_dentry (%ld)\n", MODNAME, PTR_ERR(raw));
     goto exit;
   }
-  // Allocate buffer  for this path
-  len = strlen(path);
-  path = kmalloc(sizeof(*path) * len, GFP_ATOMIC);
-  if (path != NULL) {
-    printk("%s error calling kmalloc in dentry_complete_path (%ld)\n", MODNAME, PTR_ERR(path));
+  // Allocate buffer for this path
+  len = strlen(raw) + 1;
+  path = (char *)kmalloc(sizeof(*path) * len, GFP_ATOMIC);
+  if (path == NULL) {
+    pr_err("%s kmalloc for path failed in get_complete_path_from_dentry\n", MODNAME);
     goto exit;
   }
   // Copy the string from the buffer to path
-  strncpy(path, ret, len);
+  strncpy(path, raw, len - 1);
+  path[len] = '\0';
 exit:
-  if (buf)
-    free_page((unsigned long)buf);
+  if (buffer)
+    free_page((unsigned long)buffer);
   // NOTE: freeing ret should not be necessary as it is just a pointer to memory allocated in buf
   return path;
 }
@@ -52,11 +53,12 @@ exit:
 // Check if effective user id is root
 bool is_euid_root(void) {
   const struct cred *cur_cred;
+  bool ret;
 
   cur_cred = current_cred();
-  bool ret = uid_eq(cur_cred->euid, GLOBAL_ROOT_UID);
+  ret = uid_eq(cur_cred->euid, GLOBAL_ROOT_UID);
   if (!ret)
-    printk("%s: user is not effective uid root\n", MODNAME);
+    pr_info("%s: user is not euid root\n", MODNAME);
 
   return ret;
 }
@@ -72,21 +74,21 @@ int is_root_and_correct_password(const char *password) {
   // Get free page
   buffer = kmalloc(sizeof(*buffer) * PASSWORD_MAX_LEN, GFP_ATOMIC);
   if (buffer == NULL) {
-    printk("%s: error kmalloc in syscall change_password\n", MODNAME);
+    pr_err("%s: kmalloc failed in is_root_and_correct_password\n", MODNAME);
     ret = -ENOMEM;
     goto exit;
   }
 
   // Copy provided password from user into buffer
-  if (copy_from_user(buffer, password, PASSWORD_MAX_LEN) < 0) {
-    printk("%s: error copy_from_user (old_password) in syscall change_password\n", MODNAME);
+  if ((ret = copy_from_user(buffer, password, PASSWORD_MAX_LEN)) < 0) {
+    pr_err("%s: copy_from_user for password failed in is_root_and_correct_password\n", MODNAME);
     ret = -EINVAL;
     goto exit;
   }
 
   // Check if the hash differs
   if (!check_hash(buffer, refmon.password_hash)) {
-    printk("%s: check_hash failed in syscall change_password", MODNAME);
+    pr_err("%s: check_hash failed in is_root_and_correct_password\n", MODNAME);
     ret = -EPERM;
     goto exit;
   }
