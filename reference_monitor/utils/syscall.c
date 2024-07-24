@@ -89,14 +89,9 @@ asmlinkage long sys_reference_monitor_set_state(const char *password, int state)
   if ((ret = is_root_and_correct_password(buffer, password)) < 0)
     goto exit;
 
-  // Update state TODO: adhere to specs
+  // Update state
+  // FIXME: adhere to specs for state change
   refmon.state = state;
-
-  // Register/unregister probes based on the state TODO: adhere to specs
-  if (state == REFMON_STATE_ON)
-    ret = probes_register();
-  else if (state == REFMON_STATE_OFF)
-    probes_unregister();
 
 exit:
   if (buffer)
@@ -114,7 +109,7 @@ __SYSCALL_DEFINEx(2, _reference_monitor_add_path, const char *, password, const 
 #else
 asmlinkage long sys_reference_monitor_add_path(const char *password, const char *path) {
 #endif
-  char *buffer = NULL;
+  char *buffer = NULL, *absolute_path = NULL;
   struct reference_monitor_path *node = NULL;
   long ret = 0;
 
@@ -131,7 +126,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
     return ret;
 
   // Check if it can be reconfigures
-  if (refmon.state != REFMON_STATE_REC_ON || refmon.state != REFMON_STATE_REC_OFF) {
+  if (refmon.state != RM_REC_ON && refmon.state != RM_REC_OFF) {
     pr_info("%s: state does not allow to reconfigure\n", MODNAME);
     return -EPERM;
   }
@@ -142,8 +137,15 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
     ret = -EINVAL;
     goto exit;
   }
+
+  // Setting the path to the buffer
+  absolute_path = get_absolute_path_from_relative(buffer);
+  if (absolute_path == NULL) {
+    ret = -EINVAL;
+    goto exit;
+  }
   // Search for node in the rcu list
-  node = search_for_path_in_list(buffer);
+  node = search_for_path_in_list(absolute_path);
   // Node found, so the path is already in the list
   if (node != NULL) {
     pr_info("%s: path already in list in syscall add_path\n", MODNAME);
@@ -151,13 +153,12 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   }
   // Node not found; creating new one
   node = kmalloc(sizeof(*node), GFP_ATOMIC);
-  if (node != NULL) {
+  if (node == NULL) {
     pr_err("%s: kmalloc for node failed in syscall add_path\n", MODNAME);
     ret = -ENOMEM;
     goto exit;
   }
-  // Setting the path to the buffer
-  node->path = buffer;
+  node->path = absolute_path;
 
   // Adding the node in an atomic way to the rcu list
   spin_lock(&refmon.lock);
@@ -168,6 +169,8 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
 exit: // On error or node found
   if (buffer)
     free_page((unsigned long)buffer);
+  if (absolute_path)
+    kfree(absolute_path);
 exit_no_free: // On correct insertion
   return ret;
 }
@@ -199,10 +202,11 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
     return ret;
 
   // Check if it can be reconfigured
-  if (refmon.state != REFMON_STATE_REC_ON || refmon.state != REFMON_STATE_REC_OFF) {
+  if (refmon.state != RM_REC_ON && refmon.state != RM_REC_OFF) {
     pr_info("%s: state does not allow to reconfigure\n", MODNAME);
     return -EPERM;
   }
+
   // Copy provided path into buffer
   if ((ret = copy_from_user(buffer, path, PATH_MAX)) < 0) {
     pr_err("%s: copy_from_user failed for path in syscall delete_path\n", MODNAME);
