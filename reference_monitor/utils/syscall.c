@@ -118,7 +118,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   struct reference_monitor_path *node = NULL;
   long ret = 0;
 
-  printk(KERN_INFO "%s: add_path\n", MODNAME);
+  pr_info(KERN_INFO "%s: add_path\n", MODNAME);
   // Get free page
   buffer = (char *)__get_free_page(GFP_ATOMIC);
   if (buffer == NULL) {
@@ -186,7 +186,7 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
   struct reference_monitor_path *node = NULL;
   long ret = 0;
 
-  printk(KERN_INFO "%s: delete_path\n", MODNAME);
+  pr_info(KERN_INFO "%s: delete_path\n", MODNAME);
   // Get new buffer
   buffer = (char *)__get_free_page(GFP_ATOMIC);
   if (buffer == NULL) {

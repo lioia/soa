@@ -116,7 +116,7 @@ void probes_init(void) {
   CREATE_PROBE(vfs_rename);
   CREATE_PROBE(vfs_symlink);
 
-  printk("%s: initialized probe\n", MODNAME);
+  pr_info("%s: initialized probe\n", MODNAME);
 }
 
 int probes_register(void) {
@@ -141,5 +141,5 @@ void probes_unregister(void) {
   unregister_kretprobe(&vfs_rmdir_probe);
   unregister_kretprobe(&vfs_rename_probe);
   unregister_kretprobe(&vfs_symlink_probe);
-  printk("%s: correctly unregistered probes\n", MODNAME);
+  pr_info("%s: correctly unregistered probes\n", MODNAME);
 }

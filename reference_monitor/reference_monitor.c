@@ -52,11 +52,11 @@ int init_module(void) {
   // Variable Declaration
   int i, ret;
 
-  printk("%s: init\n", MODNAME);
+  pr_info("%s: init\n", MODNAME);
 
   // System Call Initialization
   if (the_syscall_table == 0x0) {
-    printk("%s: cannot manage sys_call_table address set to 0x0\n", MODNAME);
+    pr_err("%s: cannot manage sys_call_table address set to 0x0\n", MODNAME);
     return -1;
   }
   new_sys_call_array[0] = (unsigned long)sys_reference_monitor_change_password;
@@ -65,7 +65,7 @@ int init_module(void) {
   new_sys_call_array[3] = (unsigned long)sys_reference_monitor_delete_path;
   ret = get_entries(restore, HACKED_ENTRIES, (unsigned long *)the_syscall_table, &the_ni_syscall);
   if (ret != HACKED_ENTRIES) {
-    printk("%s: could not hack %d entries (just %d)\n", MODNAME, HACKED_ENTRIES, ret);
+    pr_err("%s: could not hack %d entries (just %d)\n", MODNAME, HACKED_ENTRIES, ret);
     return -1;
   }
   unprotect_memory();
@@ -76,25 +76,25 @@ int init_module(void) {
 
   protect_memory();
 
-  printk("%s: all new system-calls correctly installed on sys-call table\n", MODNAME);
+  pr_info("%s: all new system-calls correctly installed on sys-call table\n", MODNAME);
 
   // Reference Monitor initialization
   refmon.state = REFMON_STATE_OFF;
   refmon.password_hash = kmalloc(sizeof(*refmon.password_hash) * 32, GFP_KERNEL);
   if (refmon.password_hash == NULL) {
-    printk(KERN_ERR "failed to allocate password_hash\n");
+    pr_err(KERN_ERR "failed to allocate password_hash\n");
     return -ENOMEM;
   }
   refmon.password_hash = crypt_data("reference_monitor_default_password");
   if (refmon.password_hash == NULL) {
-    printk(KERN_ERR "failed to crypt_data for default password\n");
+    pr_err(KERN_ERR "failed to crypt_data for default password\n");
     return -ENOMEM;
   }
   spin_lock_init(&refmon.lock);
   INIT_LIST_HEAD(&refmon.list);
 
   probes_init();
-  printk("%s: correctly initialized\n", MODNAME);
+  pr_info("%s: correctly initialized\n", MODNAME);
 
   return 0;
 }
@@ -103,7 +103,7 @@ void cleanup_module(void) {
   // Variable Declaration
   int i;
 
-  printk("%s: cleanup\n", MODNAME);
+  pr_info("%s: cleanup\n", MODNAME);
 
   // System Call Cleanup
   unprotect_memory();
@@ -118,5 +118,5 @@ void cleanup_module(void) {
   if (refmon.state == REFMON_STATE_ON)
     probes_unregister();
 
-  printk("%s: sys-call table restored to its original content\n", MODNAME);
+  pr_info("%s: sys-call table restored to its original content\n", MODNAME);
 }
