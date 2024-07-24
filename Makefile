@@ -1,6 +1,8 @@
 SYS_CALL_TABLE_ADDRESS = $(shell cat /sys/module/the_usctm/parameters/sys_call_table_address)
 
-all:
+all: modules user
+
+modules:
 	@echo "Building System Call Table Discoverer"
 	@cd libs/sys_call_table_discoverer && $(MAKE) all
 	@echo "Building Reference Monitor"
