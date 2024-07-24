@@ -55,8 +55,8 @@ int main(int argc, char **argv) {
 }
 
 int change_password(int hide) {
-  int ret = 0;
   char *old_password, *new_password;
+
   printf("Enter old password: ");
   old_password = get_string(hide);
   printf("Enter new password: ");
@@ -66,23 +66,49 @@ int change_password(int hide) {
     perror("get_password failed in change_password\n");
   }
 
-  ret = syscall(CHANGE_PASSWORD, new_password, old_password);
-
-  return ret;
+  return syscall(CHANGE_PASSWORD, new_password, old_password);
 }
 
 int set_state(int hide) {
-  puts("NOT IMPLEMENTED YET");
-  return 0;
+  int command = -1;
+  char *password;
+
+  printf("Enter password: ");
+  password = get_string(hide);
+  while (1) {
+    puts("Enter a possible state:");
+    puts("1) OFF");
+    puts("2) ON");
+    puts("3) REC-OFF");
+    puts("4) REC-ON");
+
+    command = get_integer("Enter an option: ");
+    if (command <= 0 || command > 4) {
+      puts("Invalid option");
+      continue;
+    }
+
+    break;
+  }
+  return syscall(SET_STATE, password, command - 1);
 }
+
 int add_path(int hide) {
-  puts("NOT IMPLEMENTED YET");
-  return 0;
+  char *password, *path;
+
+  printf("Enter password: ");
+  password = get_string(hide);
+  printf("Enter path: ");
+  path = get_string(0);
+
+  return syscall(ADD_PATH, password, path);
 }
+
 int remove_path(int hide) {
   puts("NOT IMPLEMENTED YET");
   return 0;
 }
+
 int print_logs(int hide) {
   puts("NOT IMPLEMENTED YET");
   return 0;
