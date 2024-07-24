@@ -4,7 +4,7 @@ the_reference_monitor-objs += reference_monitor.o libs/scth.o utils/crypto.o pro
 all: reference_monitor_module reference_monitor_user
 
 reference_monitor_user:
-	$(CC) -Wall -Wextra -o user/user user/user.c
+	$(CC) -Wall -Wextra -o user/user user/user.c user/io.c
 reference_monitor_module:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 clean:
