@@ -3,6 +3,8 @@
 #include <linux/errno.h>
 #include <linux/gfp.h>
 #include <linux/limits.h>
+#include <linux/namei.h>
+#include <linux/path.h>
 #include <linux/printk.h>
 #include <linux/rcupdate.h>
 #include <linux/slab.h>
@@ -100,4 +102,48 @@ struct reference_monitor_path *search_for_path_in_list(const char *path) {
   }
   rcu_read_unlock();
   return found ? node : NULL;
+}
+
+// FIXME: not working for ~
+char *get_absolute_path_from_relative(char *rel_path) {
+  struct path path;
+  char *cleaned_path, *absolute_path, *result = NULL;
+  int ret;
+
+  if (rel_path[0] == '~')
+    cleaned_path = kstrdup(rel_path + 1, GFP_ATOMIC);
+  else
+    cleaned_path = kstrdup(rel_path, GFP_ATOMIC);
+  if (cleaned_path == NULL) {
+    pr_err("%s: kstrdup failed in get_absolute_path_from_relative\n", MODNAME);
+    return NULL;
+  }
+
+  // Follow relative path
+  ret = kern_path(cleaned_path, LOOKUP_FOLLOW, &path);
+  if (ret) {
+    pr_err("%s: kern_path failed in get_absolute_path_from_relative\n", MODNAME);
+    kfree(cleaned_path);
+    return NULL;
+  }
+
+  // Allocate space for the absolute path
+  absolute_path = kmalloc(sizeof(*absolute_path) * PATH_MAX, GFP_ATOMIC);
+  if (absolute_path == NULL) {
+    pr_err("%s: kmalloc for absolute_path failed in get_absolute_path_from_relative\n", MODNAME);
+    goto exit;
+  }
+
+  // Convert path into string
+  result = d_path(&path, absolute_path, PATH_MAX);
+  if (IS_ERR(result)) {
+    pr_err("%s: d_path failed in get_absolute_path_from_relative\n", MODNAME);
+    kfree(absolute_path);
+    result = NULL;
+  }
+
+exit:
+  path_put(&path);
+  kfree(cleaned_path);
+  return result;
 }
