@@ -23,22 +23,36 @@ __SYSCALL_DEFINEx(2, _reference_monitor_change_password, const char *, password,
 #else
 asmlinkage long sys_reference_monitor_change_password(const char *password, const char *old_password) {
 #endif
-  char *buffer = NULL;
+  char *buffer = NULL, *tmp = NULL;
   long ret = 0;
 
-  printk(KERN_INFO "%s: change_password\n", MODNAME);
+  pr_info("%s: change_password\n", MODNAME);
   // Check for root and if provided password (copy is inside the function) is correct
   if ((ret = is_root_and_correct_password(old_password)) < 0)
     goto exit;
 
+  // Get free page
+  buffer = kmalloc(sizeof(*buffer) * PASSWORD_MAX_LEN, GFP_ATOMIC);
+  if (buffer == NULL) {
+    pr_err("%s: kmalloc failed in syscall change_password\n", MODNAME);
+    ret = -ENOMEM;
+    goto exit;
+  }
   // Copy new password into a buffer
-  if (copy_from_user(buffer, password, PASSWORD_MAX_LEN) < 0) {
-    printk("%s: error copy_from_user (password) in syscall change_password\n", MODNAME);
+  if ((ret = copy_from_user(buffer, password, PASSWORD_MAX_LEN)) < 0) {
+    pr_err("%s: cropy_from_user for password failed in syscall change_password\n", MODNAME);
     ret = -EINVAL;
     goto exit;
   }
   // Update the password hash
-  refmon.password_hash = crypt_data(buffer);
+  tmp = crypt_data(buffer);
+  if (tmp == NULL) {
+    pr_err("crypt_data failed in change_password\n");
+    ret = -EINVAL;
+    goto exit;
+  }
+  kfree(refmon.password_hash);
+  refmon.password_hash = tmp;
 
 exit:
   if (buffer)
@@ -56,9 +70,9 @@ __SYSCALL_DEFINEx(2, _reference_monitor_set_state, const char *, password, int, 
 #else
 asmlinkage long sys_reference_monitor_set_state(const char *password, int state) {
 #endif
-  long ret = 0;
+  int ret = 0;
 
-  printk(KERN_INFO "%s: set_state %d\n", MODNAME, state);
+  pr_info("%s: set_state %d\n", MODNAME, state);
   if ((ret = is_root_and_correct_password(password)) < 0)
     return ret;
 
@@ -67,7 +81,7 @@ asmlinkage long sys_reference_monitor_set_state(const char *password, int state)
 
   // Register/unregister probes based on the state TODO: adhere to specs
   if (state == REFMON_STATE_ON)
-    return probes_register();
+    ret = probes_register();
   else if (state == REFMON_STATE_OFF)
     probes_unregister();
 
@@ -107,7 +121,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
     goto exit;
   }
   // Copy provided path from user to buffer
-  if (copy_from_user(buffer, path, PATH_MAX) < 0) {
+  if ((ret = copy_from_user(buffer, path, PATH_MAX)) < 0) {
     printk("%s: error copy_from_user (old_password) in syscall add_path\n", MODNAME);
     ret = -EINVAL;
     goto exit;
@@ -174,7 +188,7 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
     goto exit;
   }
   // Copy provided path into buffer
-  if (copy_from_user(buffer, path, PATH_MAX) < 0) {
+  if ((ret = copy_from_user(buffer, path, PATH_MAX)) < 0) {
     printk("%s: error copy_from_user (old_password) in syscall change_password\n", MODNAME);
     ret = -EINVAL;
     goto exit;
