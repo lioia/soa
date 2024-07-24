@@ -11,6 +11,8 @@
 #include "../utils/utils.h"
 #include "probes.h"
 
+extern struct reference_monitor refmon;
+
 // Macro for creating a probe from the function name
 // do {} while(0) is needed to ensure that it runs as a single statement
 #define CREATE_PROBE(func_name)                                                                                        \
@@ -23,13 +25,10 @@
 
 // Macro for registering a probe from the function name
 #define REGISTER_PROBE(func_name)                                                                                      \
-  do {                                                                                                                 \
-    int ret;                                                                                                           \
-    if ((ret = register_kretprobe(&func_name##_probe)) < 0) {                                                          \
-      printk(KERN_ERR "%s: probe registration failed at %s: %d\n", MODNAME, #func_name, ret);                          \
-      return ret;                                                                                                      \
-    }                                                                                                                  \
-  } while (0)
+  if ((ret = register_kretprobe(&func_name##_probe)) < 0) {                                                            \
+    pr_err("%s: register_kretprobe failed for %s: %d\n", MODNAME, #func_name, ret);                                    \
+    return ret;                                                                                                        \
+  }
 
 extern struct reference_monitor refmon;
 
@@ -65,18 +64,26 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
 
 // int vfs_open(const struct path *path, struct file *file)
 static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  struct path *di_path = (struct path *)regs->di;
-  int ret = 0;
-  // Get path from dentry
-  char *path = get_complete_path_from_dentry(di_path->dentry);
+  // Variable Declaration
+  int ret;
+  struct path *di_path;
+  char *path;
+  struct reference_monitor_path *entry;
 
+  ret = 1;
+  // Get path from register
+  di_path = (struct path *)regs->di;
+  // Get path from dentry
+  path = get_complete_path_from_dentry(di_path->dentry);
   // Search for the path in the rcu list
-  struct reference_monitor_path *entry = search_for_path_in_list(path);
-  // No entry found, returning 1 so the post handler is not executed
-  if (entry == NULL) {
-    ret = 1;
+  entry = search_for_path_in_list(path);
+
+  // No entry found;
+  if (entry == NULL)
     goto exit;
-  }
+
+  // Entry found; post handler has to be activated
+  ret = 1;
 
   // TODO: deferred work (write to fs, calculate hash)
 
@@ -86,20 +93,20 @@ exit:
   return ret;
 }
 
-static int vfs_unlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+static int vfs_unlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 1; }
 
 // int vfs_link(struct dentry *old_dentry, struct mnt_idmap *idmap,
 // 	     struct inode *dir, struct dentry *new_dentry,
 // 	     struct inode **delegated_inode)
-static int vfs_link_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 0; }
+static int vfs_link_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 1; }
 
-static int vfs_mkdir_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
+static int vfs_mkdir_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 1; }
 
-static int vfs_rmdir_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
+static int vfs_rmdir_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 1; }
 
-static int vfs_rename_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
+static int vfs_rename_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 1; }
 
-static int vfs_symlink_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 0; }
+static int vfs_symlink_probe_entry_handler(struct kretprobe_instance *ri, struct pt_regs *regs) { return 1; }
 
 void probes_init(void) {
   CREATE_PROBE(vfs_open);
@@ -123,7 +130,7 @@ int probes_register(void) {
   REGISTER_PROBE(vfs_rmdir);
   REGISTER_PROBE(vfs_rename);
   REGISTER_PROBE(vfs_symlink);
-  printk("%s: correctly registered probes\n", MODNAME);
+  pr_info("%s: correctly registered probes\n", MODNAME);
   return ret;
 }
 
