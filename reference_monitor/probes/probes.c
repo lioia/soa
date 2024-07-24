@@ -70,6 +70,8 @@ static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_
   char *path = NULL;
   struct reference_monitor_path *entry = NULL;
 
+  if (refmon.state == RM_OFF || refmon.state == RM_REC_OFF)
+    return ret;
   // Get path from register
   di_path = (struct path *)regs->di;
   // Get path from dentry
@@ -82,7 +84,7 @@ static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_
     goto exit;
 
   // Entry found; post handler has to be activated
-  ret = 1;
+  ret = 0;
 
   // TODO: deferred work (write to fs, calculate hash)
 

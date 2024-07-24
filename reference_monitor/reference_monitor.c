@@ -79,7 +79,7 @@ int init_module(void) {
   pr_info("%s: all new system-calls correctly installed on sys-call table\n", MODNAME);
 
   // Reference Monitor initialization
-  refmon.state = REFMON_STATE_OFF;
+  refmon.state = RM_OFF;
   refmon.password_hash = kmalloc(sizeof(*refmon.password_hash) * 32, GFP_KERNEL);
   if (refmon.password_hash == NULL) {
     pr_err(KERN_ERR "failed to allocate password_hash\n");
@@ -94,6 +94,7 @@ int init_module(void) {
   INIT_LIST_HEAD(&refmon.list);
 
   probes_init();
+  probes_register();
   pr_info("%s: correctly initialized\n", MODNAME);
 
   return 0;
@@ -102,6 +103,9 @@ int init_module(void) {
 void cleanup_module(void) {
   // Variable Declaration
   int i;
+
+  // Unregister probes
+  probes_unregister();
 
   pr_info("%s: cleanup\n", MODNAME);
 
@@ -114,9 +118,6 @@ void cleanup_module(void) {
 
   // Reference Monitor Cleanup
   kfree(refmon.password_hash);
-  // Unregister probes if they were enabled
-  if (refmon.state == REFMON_STATE_ON)
-    probes_unregister();
 
   pr_info("%s: sys-call table restored to its original content\n", MODNAME);
 }
