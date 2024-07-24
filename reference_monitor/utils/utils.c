@@ -63,21 +63,12 @@ bool is_euid_root(void) {
   return ret;
 }
 
-int is_root_and_correct_password(const char *password) {
-  char *buffer = NULL;
+int is_root_and_correct_password(char *buffer, const char *password) {
   int ret = 0;
 
   // Check if root
   if (!is_euid_root())
     return -EPERM;
-
-  // Get free page
-  buffer = kmalloc(sizeof(*buffer) * PASSWORD_MAX_LEN, GFP_ATOMIC);
-  if (buffer == NULL) {
-    pr_err("%s: kmalloc failed in is_root_and_correct_password\n", MODNAME);
-    ret = -ENOMEM;
-    goto exit;
-  }
 
   // Copy provided password from user into buffer
   if ((ret = copy_from_user(buffer, password, PASSWORD_MAX_LEN)) < 0) {
@@ -93,8 +84,6 @@ int is_root_and_correct_password(const char *password) {
     goto exit;
   }
 exit:
-  if (buffer)
-    kfree(buffer);
   return ret;
 }
 

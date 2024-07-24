@@ -27,17 +27,21 @@ asmlinkage long sys_reference_monitor_change_password(const char *password, cons
   long ret = 0;
 
   pr_info("%s: change_password\n", MODNAME);
-  // Check for root and if provided password (copy is inside the function) is correct
-  if ((ret = is_root_and_correct_password(old_password)) < 0)
-    goto exit;
-
   // Get free page
-  buffer = kmalloc(sizeof(*buffer) * PASSWORD_MAX_LEN, GFP_ATOMIC);
+  buffer = (char *)__get_free_page(GFP_ATOMIC);
   if (buffer == NULL) {
-    pr_err("%s: kmalloc failed in syscall change_password\n", MODNAME);
+    pr_err("%s: get_free_page failed in syscall change_password\n", MODNAME);
     ret = -ENOMEM;
     goto exit;
   }
+
+  // Check for root and if provided password (copy is inside the function) is correct
+  if ((ret = is_root_and_correct_password(buffer, old_password)) < 0)
+    goto exit;
+
+  // Zero page for reusage
+  clear_page(buffer);
+
   // Copy new password into a buffer
   if ((ret = copy_from_user(buffer, password, PASSWORD_MAX_LEN)) < 0) {
     pr_err("%s: cropy_from_user for password failed in syscall change_password\n", MODNAME);
@@ -56,7 +60,7 @@ asmlinkage long sys_reference_monitor_change_password(const char *password, cons
 
 exit:
   if (buffer)
-    kfree(buffer);
+    free_page((unsigned long)buffer);
   return ret;
 }
 
@@ -70,11 +74,20 @@ __SYSCALL_DEFINEx(2, _reference_monitor_set_state, const char *, password, int, 
 #else
 asmlinkage long sys_reference_monitor_set_state(const char *password, int state) {
 #endif
+  char *buffer = NULL;
   int ret = 0;
 
+  // Get free page
+  buffer = (char *)__get_free_page(GFP_ATOMIC);
+  if (buffer == NULL) {
+    pr_err("%s: get_free_page failed in syscall change_password\n", MODNAME);
+    ret = -ENOMEM;
+    goto exit;
+  }
+
   pr_info("%s: set_state %d\n", MODNAME, state);
-  if ((ret = is_root_and_correct_password(password)) < 0)
-    return ret;
+  if ((ret = is_root_and_correct_password(buffer, password)) < 0)
+    goto exit;
 
   // Update state TODO: adhere to specs
   refmon.state = state;
@@ -85,6 +98,9 @@ asmlinkage long sys_reference_monitor_set_state(const char *password, int state)
   else if (state == REFMON_STATE_OFF)
     probes_unregister();
 
+exit:
+  if (buffer)
+    free_page((unsigned long)buffer);
   return ret;
 }
 
@@ -103,26 +119,26 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   long ret = 0;
 
   printk(KERN_INFO "%s: add_path\n", MODNAME);
-  // Check if root and provided password is correct
-  if ((ret = is_root_and_correct_password(password)) < 0)
-    return ret;
-
-  // Check if it can be reconfigures
-  if (refmon.state != REFMON_STATE_REC_ON) {
-    printk("%s: state does not allow to reconfigure\n", MODNAME);
-    return -EPERM;
-  }
-
-  // Get a page to store the password
+  // Get free page
   buffer = (char *)__get_free_page(GFP_ATOMIC);
   if (buffer == NULL) {
-    printk("%s: error get_free_page in syscall add_path\n", MODNAME);
+    pr_err("%s: get_free_page failed for buffer in syscall add_path\n", MODNAME);
     ret = -ENOMEM;
     goto exit;
   }
+  // Check if root and provided password is correct
+  if ((ret = is_root_and_correct_password(buffer, password)) < 0)
+    return ret;
+
+  // Check if it can be reconfigures
+  if (refmon.state != REFMON_STATE_REC_ON || refmon.state != REFMON_STATE_REC_OFF) {
+    pr_info("%s: state does not allow to reconfigure\n", MODNAME);
+    return -EPERM;
+  }
+
   // Copy provided path from user to buffer
   if ((ret = copy_from_user(buffer, path, PATH_MAX)) < 0) {
-    printk("%s: error copy_from_user (old_password) in syscall add_path\n", MODNAME);
+    pr_err("%s: copy_from_user for path failed in syscall add_path\n", MODNAME);
     ret = -EINVAL;
     goto exit;
   }
@@ -130,13 +146,13 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   node = search_for_path_in_list(buffer);
   // Node found, so the path is already in the list
   if (node != NULL) {
-    printk("%s: syscall add_path node already in list\n", MODNAME);
+    pr_info("%s: path already in list in syscall add_path\n", MODNAME);
     goto exit;
   }
   // Node not found; creating new one
   node = kmalloc(sizeof(*node), GFP_ATOMIC);
   if (node != NULL) {
-    printk("%s: error kmalloc in syscall add_path\n", MODNAME);
+    pr_err("%s: kmalloc for node failed in syscall add_path\n", MODNAME);
     ret = -ENOMEM;
     goto exit;
   }
@@ -171,25 +187,25 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
   long ret = 0;
 
   printk(KERN_INFO "%s: delete_path\n", MODNAME);
-  // Check if root and password provided is correct
-  if ((ret = is_root_and_correct_password(password)) < 0)
-    return ret;
-
-  // Check if it can be reconfigured
-  if (refmon.state != REFMON_STATE_REC_ON) {
-    printk("%s: state does not allow to reconfigure\n", MODNAME);
-    return -EPERM;
-  }
   // Get new buffer
   buffer = (char *)__get_free_page(GFP_ATOMIC);
   if (buffer == NULL) {
-    printk("%s: error get_free_page in syscall add_path\n", MODNAME);
+    pr_err("%s: get_free_page for buffer failed in syscall delete_path\n", MODNAME);
     ret = -ENOMEM;
     goto exit;
   }
+  // Check if root and password provided is correct
+  if ((ret = is_root_and_correct_password(buffer, password)) < 0)
+    return ret;
+
+  // Check if it can be reconfigured
+  if (refmon.state != REFMON_STATE_REC_ON || refmon.state != REFMON_STATE_REC_OFF) {
+    pr_info("%s: state does not allow to reconfigure\n", MODNAME);
+    return -EPERM;
+  }
   // Copy provided path into buffer
   if ((ret = copy_from_user(buffer, path, PATH_MAX)) < 0) {
-    printk("%s: error copy_from_user (old_password) in syscall change_password\n", MODNAME);
+    pr_err("%s: copy_from_user failed for path in syscall delete_path\n", MODNAME);
     ret = -EINVAL;
     goto exit;
   }

@@ -65,12 +65,11 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
 // int vfs_open(const struct path *path, struct file *file)
 static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
   // Variable Declaration
-  int ret;
-  struct path *di_path;
-  char *path;
-  struct reference_monitor_path *entry;
+  int ret = 1;
+  struct path *di_path = NULL;
+  char *path = NULL;
+  struct reference_monitor_path *entry = NULL;
 
-  ret = 1;
   // Get path from register
   di_path = (struct path *)regs->di;
   // Get path from dentry
