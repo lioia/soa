@@ -11,51 +11,53 @@
 
 char *crypt_data(const unsigned char *data) {
   // Variable Declaration
-  struct crypto_shash *alg = NULL;
-  struct shash_desc *sdesc = NULL;
-  char *digest = NULL, *result = NULL;
-  int size, ret, i;
+  struct crypto_shash *tfm = NULL;
+  struct shash_desc *desc = NULL;
+  char *digest = NULL;
+  int ret;
 
-  alg = crypto_alloc_shash("sha256", 0, 0);
-  if (IS_ERR(alg)) {
-    printk(KERN_ERR "failed to allocate alg for sha256\n");
+  tfm = crypto_alloc_shash("sha256", 0, 0);
+  if (IS_ERR(tfm)) {
+    pr_err("crypto_alloc_shash failed\n");
     return NULL;
   }
-  size = sizeof(struct shash_desc) + crypto_shash_descsize(alg);
-  sdesc = kmalloc(size, GFP_KERNEL);
-  if (sdesc == NULL) {
-    printk(KERN_ERR "failed to allocate sdesc\n");
+  desc = kmalloc(sizeof(struct shash_desc) + crypto_shash_descsize(tfm), GFP_KERNEL);
+  if (desc == NULL) {
+    pr_err("kmalloc failed for desc\n");
     goto exit;
   }
-  sdesc->tfm = alg;
+  desc->tfm = tfm;
+
+  ret = crypto_shash_init(desc);
+  if (ret < 0) {
+    pr_err("crypto_shash_init failed\n");
+    goto exit;
+  }
+
+  ret = crypto_shash_update(desc, data, strlen(data));
+  if (ret < 0) {
+    pr_err("crypto_shash_update failed\n");
+    goto exit;
+  }
 
   digest = kmalloc(sizeof(*digest) * 32, GFP_KERNEL);
   if (digest == NULL) {
-    printk(KERN_ERR "failed to allocate digest\n");
+    pr_err("kmalloc failed for buffer\n");
     goto exit;
   }
 
-  ret = crypto_shash_digest(sdesc, data, strlen(data), digest);
-  if (ret) {
-    printk(KERN_ERR "failed to calculate digest\n");
+  ret = crypto_shash_final(desc, digest);
+  if (ret < 0) {
+    pr_err("crypto_shash_final failed\n");
     goto exit;
   }
-  result = kmalloc(2 * 32 + 1, GFP_KERNEL);
-  if (!result) {
-    printk(KERN_ERR "failed to allocate result\n");
-    goto exit;
-  }
-  for (i = 0; i < 32; i++)
-    sprintf(&result[i * 2], "%02x", digest[i]);
 
 exit:
-  if (digest)
-    kfree(digest);
-  if (sdesc)
-    kfree(sdesc);
-  if (alg)
-    crypto_free_shash(alg);
-  return result;
+  if (desc)
+    kfree(desc);
+  if (tfm)
+    crypto_free_shash(tfm);
+  return digest;
 }
 
 bool check_hash(const unsigned char *data, const unsigned char *hashed) {
