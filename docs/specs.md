@@ -45,5 +45,5 @@ to write-open a protected file system path is attempted:
 - the program path-name that is currently attempting the open
 - a cryptographic hash of the program file content
 
-The the computation of the cryptographic hash and the writing of the above tuple
+The computation of the cryptographic hash and the writing of the above tuple
 should be carried in deferred work.
