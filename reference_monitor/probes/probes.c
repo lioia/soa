@@ -45,167 +45,31 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
 
 // int vfs_open(const struct path *path, struct file *file)
 static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  // Variable Declaration
-  int ret = 1;
-  struct path *di_path = NULL;
-  char *path = NULL;
-  struct reference_monitor_path *entry = NULL;
-
-  if (refmon.state == RM_OFF || refmon.state == RM_REC_OFF)
-    return ret;
-  // Get path from register
-  di_path = (struct path *)regs->di;
-  // Get path from dentry
-  path = get_complete_path_from_dentry(di_path->dentry);
-  // Search for the path in the rcu list
-  entry = search_for_path_in_list(path);
-
-  // No entry found;
-  if (entry == NULL)
-    goto exit;
-
-  // Entry found; post handler has to be activated
-  ret = 0;
-
-  // TODO: deferred work (write to fs, calculate hash)
-
-exit:
-  if (path)
-    kfree(path);
-  return ret;
+  HANDLE_PROBE(((struct path *)regs->di)->dentry, "open");
 }
 
 // int security_path_symlink(const struct path *dir, struct dentry *dentry, const char *old_name)
 static int security_path_unlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  // Variable Declaration
-  int ret = 1;
-  char *path = NULL;
-  struct dentry *dentry = NULL;
-  struct reference_monitor_path *entry = NULL;
-
-  if (refmon.state == RM_OFF || refmon.state == RM_REC_OFF)
-    return ret;
-
-  dentry = (struct dentry *)regs->si;
-
-  // Get path from dentry
-  path = get_complete_path_from_dentry(dentry);
-  // Search for the path in the rcu list
-  entry = search_for_path_in_list(path);
-
-  // No entry found;
-  if (entry == NULL)
-    goto exit;
-
-  // Entry found; post handler has to be activated
-  ret = 0;
-
-  // TODO: deferred work (write to fs, calculate hash)
-
-exit:
-  if (path)
-    kfree(path);
-  return ret;
+  HANDLE_PROBE((struct dentry *)regs->si, "unlink");
 }
 
 /*static int vfs_link_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 1; }*/
 
 // int security_path_mkdir(const struct path *dir, struct dentry *dentry, umode_t mode)
 static int security_path_mkdir_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  // Variable Declaration
-  int ret = 1;
-  struct dentry *dentry = NULL;
-  char *path = NULL;
-  struct reference_monitor_path *entry = NULL;
-
-  if (refmon.state == RM_OFF || refmon.state == RM_REC_OFF)
-    return ret;
-  // Get dentry from register
-  dentry = (struct dentry *)regs->si;
-  // Get path from dentry
-  path = get_complete_path_from_dentry(dentry);
-  // Search for the path in the rcu list
-  entry = search_for_path_in_list(path);
-
-  // No entry found;
-  if (entry == NULL)
-    goto exit;
-
-  // Entry found; post handler has to be activated
-  ret = 0;
-
-  // TODO: deferred work (write to fs, calculate hash)
-
-exit:
-  if (path)
-    kfree(path);
-  return ret;
+  HANDLE_PROBE((struct dentry *)regs->si, "mkdir");
 }
 
 // int security_path_rmdir(const struct path *dir, struct dentry *dentry)
 static int security_path_rmdir_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  // Variable Declaration
-  int ret = 1;
-  struct dentry *dentry = NULL;
-  char *path = NULL;
-  struct reference_monitor_path *entry = NULL;
-
-  if (refmon.state == RM_OFF || refmon.state == RM_REC_OFF)
-    return ret;
-  // Get dentry from register
-  dentry = (struct dentry *)regs->si;
-  // Get path from dentry
-  path = get_complete_path_from_dentry(dentry);
-  // Search for the path in the rcu list
-  entry = search_for_path_in_list(path);
-
-  // No entry found;
-  if (entry == NULL)
-    goto exit;
-
-  // Entry found; post handler has to be activated
-  ret = 0;
-
-  // TODO: deferred work (write to fs, calculate hash)
-
-exit:
-  if (path)
-    kfree(path);
-  return ret;
+  HANDLE_PROBE((struct dentry *)regs->si, "rmdir");
 }
 
 // int security_path_rename(const struct path *old_dir, struct dentry *old_dentry,
 //      const struct path *new_dir, struct dentry *new_dentry,
 //      unsigned int flags)
 static int security_path_rename_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  // Variable Declaration
-  int ret = 1;
-  struct dentry *dentry = NULL;
-  char *path = NULL;
-  struct reference_monitor_path *entry = NULL;
-
-  if (refmon.state == RM_OFF || refmon.state == RM_REC_OFF)
-    return ret;
-  // Get dentry from register
-  dentry = (struct dentry *)regs->si;
-  // Get path from dentry
-  path = get_complete_path_from_dentry(dentry);
-  // Search for the path in the rcu list
-  entry = search_for_path_in_list(path);
-
-  // No entry found;
-  if (entry == NULL)
-    goto exit;
-
-  // Entry found; post handler has to be activated
-  ret = 0;
-
-  // TODO: deferred work (write to fs, calculate hash)
-
-exit:
-  if (path)
-    kfree(path);
-  return ret;
+  HANDLE_PROBE((struct dentry *)regs->si, "rename");
 }
 
 /*static int vfs_symlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 1; }*/

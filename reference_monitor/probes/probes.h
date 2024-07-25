@@ -22,4 +22,35 @@ void probes_unregister(void);
     return ret;                                                                                                        \
   }
 
+#define HANDLE_PROBE(dentry_expr, func)                                                                                \
+  do {                                                                                                                 \
+    int ret = 1;                                                                                                       \
+    char *path = NULL;                                                                                                 \
+    struct dentry *dentry = NULL;                                                                                      \
+    struct reference_monitor_path *entry = NULL;                                                                       \
+                                                                                                                       \
+    if (refmon.state == RM_OFF || refmon.state == RM_REC_OFF)                                                          \
+      return ret;                                                                                                      \
+                                                                                                                       \
+    dentry = dentry_expr;                                                                                              \
+                                                                                                                       \
+    /* Get path from dentry */                                                                                         \
+    path = get_complete_path_from_dentry(dentry);                                                                      \
+    /* Search for the path in the rcu list */                                                                          \
+    entry = search_for_path_in_list(path);                                                                             \
+                                                                                                                       \
+    /* No entry found; */                                                                                              \
+    if (entry == NULL)                                                                                                 \
+      goto exit;                                                                                                       \
+                                                                                                                       \
+    /* Entry found; post handler has to be activated */                                                                \
+    ret = 0;                                                                                                           \
+                                                                                                                       \
+    /* TODO: deferred work (write to fs, calculate hash) */                                                            \
+                                                                                                                       \
+  exit:                                                                                                                \
+    if (path)                                                                                                          \
+      kfree(path);                                                                                                     \
+    return ret;                                                                                                        \
+  } while (0)
 #endif // !PROBES_H
