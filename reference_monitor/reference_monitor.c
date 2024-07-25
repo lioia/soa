@@ -24,10 +24,10 @@
 #include <linux/version.h>
 #include <linux/vmalloc.h>
 
-#include "crypto/crypto.h"
 #include "libs/scth.h"
 #include "probes/probes.h"
 #include "reference_monitor.h"
+#include "utils/utils.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Alessandro Lioi <alessandro.lioi@students.uniroma2.it>");

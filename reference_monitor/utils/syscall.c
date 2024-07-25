@@ -11,7 +11,6 @@
 #include <linux/uidgid.h>
 #include <linux/version.h>
 
-#include "../crypto/crypto.h"
 #include "../reference_monitor.h"
 #include "utils.h"
 
