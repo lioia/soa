@@ -1,4 +1,5 @@
 #ifndef IO_H
+#define IO_H
 
 #define flush(stdin)                                                                                                   \
   do {                                                                                                                 \

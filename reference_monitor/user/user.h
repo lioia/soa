@@ -1,4 +1,5 @@
 #ifndef USER_H
+#define USER_H
 
 #define CHANGE_PASSWORD 156
 #define SET_STATE 174
