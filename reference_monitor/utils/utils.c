@@ -54,11 +54,9 @@ exit:
 
 // Check if effective user id is root
 bool is_euid_root(void) {
-  const struct cred *cur_cred;
   bool ret;
 
-  cur_cred = current_cred();
-  ret = uid_eq(cur_cred->euid, GLOBAL_ROOT_UID);
+  ret = uid_eq(current->cred->euid, GLOBAL_ROOT_UID);
   if (!ret)
     pr_info("%s: user is not euid root\n", MODNAME);
 
