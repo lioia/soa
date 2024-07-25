@@ -11,9 +11,8 @@
 #include <linux/uidgid.h>
 #include <linux/version.h>
 
-#include "../probes/probes.h"
+#include "../crypto/crypto.h"
 #include "../reference_monitor.h"
-#include "crypto.h"
 #include "utils.h"
 
 extern struct reference_monitor refmon;
