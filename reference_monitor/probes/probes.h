@@ -1,6 +1,8 @@
 #ifndef PROBES_H
 #define PROBES_H
 
+#include "../utils/utils.h"
+
 void probes_init(void);
 int probes_register(void);
 void probes_unregister(void);
@@ -22,7 +24,7 @@ void probes_unregister(void);
     return ret;                                                                                                        \
   }
 
-#define HANDLE_PROBE(dentry_expr, func)                                                                                \
+#define HANDLE_PROBE(dentry_expr)                                                                                      \
   do {                                                                                                                 \
     int ret = 1;                                                                                                       \
     char *path = NULL;                                                                                                 \
@@ -45,8 +47,6 @@ void probes_unregister(void);
                                                                                                                        \
     /* Entry found; post handler has to be activated */                                                                \
     ret = 0;                                                                                                           \
-                                                                                                                       \
-    /* TODO: deferred work (write to fs, calculate hash) */                                                            \
                                                                                                                        \
   exit:                                                                                                                \
     if (path)                                                                                                          \

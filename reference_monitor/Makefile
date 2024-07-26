@@ -1,6 +1,6 @@
 obj-m += the_reference_monitor.o
 the_reference_monitor-objs += reference_monitor.o libs/scth.o \
-	probes/probes.o utils/syscall.o utils/utils.o
+	probes/probes.o utils/syscall.o utils/utils.o tasks/tasks.o
 
 all: reference_monitor_module reference_monitor_user
 

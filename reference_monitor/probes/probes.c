@@ -1,14 +1,23 @@
-#include <asm/ptrace.h>
+#include <asm/current.h>
+#include <linux/cred.h>
+#include <linux/dcache.h>
 #include <linux/fs.h>
+#include <linux/fs_struct.h>
 #include <linux/kprobes.h>
+#include <linux/limits.h>
+#include <linux/path.h>
 #include <linux/printk.h>
 #include <linux/rculist.h>
 #include <linux/rcupdate.h>
+#include <linux/sched.h>
+#include <linux/sched/task.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/uidgid.h>
+#include <linux/workqueue.h>
 
 #include "../reference_monitor.h"
-#include "../utils/utils.h"
+#include "../tasks/tasks.h"
 #include "probes.h"
 
 extern struct reference_monitor refmon;
@@ -34,42 +43,84 @@ struct kretprobe security_path_rename_probe;
 // Symbolic Link
 /*struct kretprobe vfs_symlink_probe;*/
 
-// NOTE: the post handler is executed only if the entry handler returns 0
-// so a single post handler can is used for all the probes,
-// executed only if the probe has filtered the call
-// it sets the return value of the syscall to an error value (EACCES)
+// The post handler is executed only if the entry handler returns 0;
+// it sets the return value of the syscall to an error value (EACCES) and it
+// schedules the deferred work
 static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
+  struct reference_monitor_packed_work *work = NULL;
+  char *pathname = NULL, *buffer = NULL;
+  struct path pwd;
+
+  // Set return value of the function to EACCES
   regs_set_return_value(regs, -EACCES);
+
+  // Get information about the offending program
+  buffer = (char *)__get_free_page(GFP_ATOMIC);
+  if (buffer == NULL) {
+    pr_err("%s: get_free_page for buffer failed in probe_post_handler\n", MODNAME);
+    goto exit;
+  }
+  work = kmalloc(sizeof(*work), GFP_ATOMIC);
+  if (work == NULL) {
+    pr_err("%s: kmalloc for reference_monitor_packed_work failed in probe_post_handler\n", MODNAME);
+    goto exit;
+  }
+  // Lock current thread
+  task_lock(current);
+  work->tgid = current->tgid;
+  work->tid = current->pid;
+  work->uid = __kuid_val(current->cred->uid);
+  work->euid = __kuid_val(current->cred->euid);
+
+  // Get current pwd
+  pwd = current->fs->pwd;
+  path_get(&pwd);
+  task_unlock(current);
+  pathname = d_path(&pwd, buffer, PATH_MAX);
+  path_put(&pwd);
+
+  // Avoid returning path allocated with get_free_page
+  pathname = kstrdup(pathname, GFP_ATOMIC);
+  work->path = pathname;
+
+  // Schedule deferred work
+  __INIT_WORK(&(work->the_work), (void *)write_to_log, (unsigned long)(&(work->the_work)));
+
+  schedule_work(&work->the_work);
+
+exit:
+  if (buffer)
+    free_page((unsigned long)buffer);
   return 0;
 }
 
 // int vfs_open(const struct path *path, struct file *file)
 static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  HANDLE_PROBE(((struct path *)regs->di)->dentry, "open");
+  HANDLE_PROBE(((struct path *)regs->di)->dentry);
 }
 
 // int security_path_symlink(const struct path *dir, struct dentry *dentry, const char *old_name)
 static int security_path_unlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  HANDLE_PROBE((struct dentry *)regs->si, "unlink");
+  HANDLE_PROBE((struct dentry *)regs->si);
 }
 
 /*static int vfs_link_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 1; }*/
 
 // int security_path_mkdir(const struct path *dir, struct dentry *dentry, umode_t mode)
 static int security_path_mkdir_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  HANDLE_PROBE((struct dentry *)regs->si, "mkdir");
+  HANDLE_PROBE((struct dentry *)regs->si);
 }
 
 // int security_path_rmdir(const struct path *dir, struct dentry *dentry)
 static int security_path_rmdir_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  HANDLE_PROBE((struct dentry *)regs->si, "rmdir");
+  HANDLE_PROBE((struct dentry *)regs->si);
 }
 
 // int security_path_rename(const struct path *old_dir, struct dentry *old_dentry,
 //      const struct path *new_dir, struct dentry *new_dentry,
 //      unsigned int flags)
 static int security_path_rename_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  HANDLE_PROBE((struct dentry *)regs->si, "rename");
+  HANDLE_PROBE((struct dentry *)regs->si);
 }
 
 /*static int vfs_symlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 1; }*/
