@@ -48,18 +48,12 @@ struct kretprobe security_path_rename_probe;
 // schedules the deferred work
 static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
   struct reference_monitor_packed_work *work = NULL;
-  char *pathname = NULL, *buffer = NULL;
-  struct path pwd;
+  struct dentry *dentry = NULL;
 
   // Set return value of the function to EACCES
   regs_set_return_value(regs, -EACCES);
 
   // Get information about the offending program
-  buffer = (char *)__get_free_page(GFP_ATOMIC);
-  if (buffer == NULL) {
-    pr_err("%s: get_free_page for buffer failed in probe_post_handler\n", MODNAME);
-    goto exit;
-  }
   work = kmalloc(sizeof(*work), GFP_ATOMIC);
   if (work == NULL) {
     pr_err("%s: kmalloc for reference_monitor_packed_work failed in probe_post_handler\n", MODNAME);
@@ -73,15 +67,9 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
   work->euid = __kuid_val(current->cred->euid);
 
   // Get current pwd
-  pwd = current->fs->pwd;
-  path_get(&pwd);
+  dentry = current->mm->exe_file->f_path.dentry;
+  work->path = get_complete_path_from_dentry(dentry);
   task_unlock(current);
-  pathname = d_path(&pwd, buffer, PATH_MAX);
-  path_put(&pwd);
-
-  // Avoid returning path allocated with get_free_page
-  pathname = kstrdup(pathname, GFP_ATOMIC);
-  work->path = pathname;
 
   // Schedule deferred work
   __INIT_WORK(&(work->the_work), (void *)write_to_log, (unsigned long)(&(work->the_work)));
@@ -89,8 +77,6 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
   schedule_work(&work->the_work);
 
 exit:
-  if (buffer)
-    free_page((unsigned long)buffer);
   return 0;
 }
 
