@@ -1,5 +1,6 @@
 #ifndef USER_H
 #define USER_H
+#include <stdbool.h>
 
 #define CHANGE_PASSWORD 156
 #define SET_STATE 174
@@ -7,10 +8,10 @@
 #define DELETE_PATH 178
 
 int check_if_module_is_inserted();
-int change_password(int hide);
-int set_state(int hide);
-int add_path(int hide);
-int remove_path(int hide);
-int print_logs(int hide);
+int change_password(bool hide);
+int set_state(bool hide);
+int add_path(bool hide);
+int remove_path(bool hide);
+int print_logs(bool hide);
 
 #endif // !USER_H

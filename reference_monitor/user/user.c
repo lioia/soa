@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,9 +14,9 @@ int main(int argc, char **argv) {
 
   int command = -1;
   int ret = 0;
-  int hide = 0; // hide password
+  bool hide = false; // hide password
   if (argc == 2 && !strncmp(argv[1], "--hide", 4))
-    hide = 1;
+    hide = true;
 
   while (1) {
     clear();
@@ -77,7 +78,7 @@ int check_if_module_is_inserted() {
   return strncmp(live, "live", 4);
 }
 
-int change_password(int hide) {
+int change_password(bool hide) {
   char *old_password, *new_password;
 
   printf("Enter old password: ");
@@ -92,7 +93,7 @@ int change_password(int hide) {
   return syscall(CHANGE_PASSWORD, new_password, old_password);
 }
 
-int set_state(int hide) {
+int set_state(bool hide) {
   int command = -1;
   char *password;
 
@@ -116,23 +117,29 @@ int set_state(int hide) {
   return syscall(SET_STATE, password, command - 1);
 }
 
-int add_path(int hide) {
-  char *password, *path;
+int add_path(bool hide) {
+  char *password = NULL, *path = NULL;
 
   printf("Enter password: ");
   password = get_string(hide);
   printf("Enter path: ");
-  path = get_string(0);
+  path = get_string(false);
 
   return syscall(ADD_PATH, password, path);
 }
 
-int remove_path(int hide) {
-  puts("NOT IMPLEMENTED YET");
-  return 0;
+int remove_path(bool hide) {
+  char *password = NULL, *path = NULL;
+
+  printf("Enter password: ");
+  password = get_string(hide);
+  printf("Enter path: ");
+  path = get_string(false);
+
+  return syscall(DELETE_PATH, password, path);
 }
 
-int print_logs(int hide) {
+int print_logs(bool _) {
   puts("NOT IMPLEMENTED YET");
   return 0;
 }
