@@ -117,7 +117,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   if (buffer == NULL) {
     pr_err("%s: get_free_page failed for buffer in syscall add_path\n", MODNAME);
     ret = -ENOMEM;
-    goto exit;
+    goto exit_error;
   }
   // Check if root and provided password is correct
   if ((ret = is_root_and_correct_password(buffer, password)) < 0)
@@ -133,28 +133,28 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   if ((ret = copy_from_user(buffer, path, PATH_MAX)) < 0) {
     pr_err("%s: copy_from_user for path failed in syscall add_path\n", MODNAME);
     ret = -EINVAL;
-    goto exit;
+    goto exit_error;
   }
 
   // Setting the path to the buffer
   absolute_path = get_absolute_path_from_relative(buffer);
   if (absolute_path == NULL) {
     ret = -EINVAL;
-    goto exit;
+    goto exit_error;
   }
   // Search for node in the rcu list
   node = search_for_path_in_list(absolute_path);
   // Node found, so the path is already in the list
   if (node != NULL) {
     pr_info("%s: path already in list in syscall add_path\n", MODNAME);
-    goto exit;
+    goto exit_error;
   }
   // Node not found; creating new one
   node = kmalloc(sizeof(*node), GFP_ATOMIC);
   if (node == NULL) {
     pr_err("%s: kmalloc for node failed in syscall add_path\n", MODNAME);
     ret = -ENOMEM;
-    goto exit;
+    goto exit_error;
   }
   node->path = absolute_path;
 
@@ -162,14 +162,14 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   spin_lock(&refmon.lock);
   list_add_rcu(&node->next, &refmon.list);
   spin_unlock(&refmon.lock);
-  goto exit_no_free;
+  goto exit;
 
-exit: // On error or node found
-  if (buffer)
-    free_page((unsigned long)buffer);
+exit_error: // On error or node found
   if (absolute_path)
     kfree(absolute_path);
-exit_no_free: // On correct insertion
+exit: // On correct insertion
+  if (buffer)
+    free_page((unsigned long)buffer);
   return ret;
 }
 
