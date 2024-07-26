@@ -7,14 +7,20 @@
 #include "user.h"
 
 int main(int argc, char **argv) {
+  // Check if module is loaded
+  if (check_if_module_is_inserted() != 0)
+    exit(EXIT_FAILURE);
+
   int command = -1;
   int ret = 0;
   int hide = 0; // hide password
   if (argc == 2 && !strncmp(argv[1], "--hide", 4))
     hide = 1;
+
   while (1) {
     clear();
 
+    // Print Menu
     puts("---REFERENCE MONITOR---");
     puts("1) Change Password");
     puts("2) Set State");
@@ -52,6 +58,23 @@ int main(int argc, char **argv) {
     flush(stdin);
   }
   exit(EXIT_SUCCESS);
+}
+
+int check_if_module_is_inserted() {
+  FILE *fp;
+  char live[4];
+  char *path = "/sys/module/the_reference_monitor/initstate";
+  if (access(path, R_OK) != 0) {
+    fprintf(stderr, "Module is not loaded\n");
+    return -1;
+  }
+  fp = fopen(path, "r");
+  if (fp == NULL) {
+    fprintf(stderr, "Failed to read module initstate");
+    return -1;
+  }
+  fread(live, sizeof(*live), 4, fp);
+  return strncmp(live, "live", 4);
 }
 
 int change_password(int hide) {

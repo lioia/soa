@@ -6,6 +6,7 @@
 #define ADD_PATH 177
 #define DELETE_PATH 178
 
+int check_if_module_is_inserted();
 int change_password(int hide);
 int set_state(int hide);
 int add_path(int hide);
