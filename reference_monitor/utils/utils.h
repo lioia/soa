@@ -4,7 +4,10 @@
 #include <linux/dcache.h>
 #include <linux/types.h>
 
-char *crypt_data(const unsigned char *data);
+#define SHA_LENGTH 32
+#define READ_LENGTH 512
+
+char *crypt_data(const unsigned char *data, bool is_file);
 bool check_hash(const unsigned char *data, const unsigned char *hashed);
 char *get_complete_path_from_dentry(struct dentry *dentry);
 char *get_absolute_path_from_relative(char *path);

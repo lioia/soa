@@ -1,7 +1,9 @@
 #include <crypto/hash.h>
 #include <linux/cred.h>
 #include <linux/dcache.h>
+#include <linux/err.h>
 #include <linux/errno.h>
+#include <linux/fs.h>
 #include <linux/gfp.h>
 #include <linux/limits.h>
 #include <linux/namei.h>
@@ -19,7 +21,7 @@
 extern struct reference_monitor refmon;
 
 char *get_complete_path_from_dentry(struct dentry *dentry) {
-  char *buffer, *raw = NULL, *path;
+  char *buffer = NULL, *raw = NULL, *path = NULL;
   int len = 0;
 
   // Allocate buffer as a page (PATH_MAX is 4096)
@@ -105,8 +107,8 @@ struct reference_monitor_path *search_for_path_in_list(const char *path) {
 // FIXME: not working for ~
 char *get_absolute_path_from_relative(char *rel_path) {
   struct path path;
-  char *cleaned_path, *absolute_path, *result = NULL;
-  int ret;
+  char *cleaned_path = NULL, *absolute_path = NULL, *result = NULL;
+  int ret = 0;
 
   if (rel_path[0] == '~')
     cleaned_path = kstrdup(rel_path + 1, GFP_ATOMIC);
@@ -148,63 +150,89 @@ exit:
 
 // Adapted from https://github.com/torvalds/linux/blob/master/Documentation/crypto/api-samples.rst
 
-char *crypt_data(const unsigned char *data) {
+char *crypt_data(const unsigned char *data, bool is_file) {
   // Variable Declaration
+  int ret = 0, bytes_read = 0, i = 0;
   struct crypto_shash *tfm = NULL;
   struct shash_desc *desc = NULL;
-  char *digest = NULL;
-  int ret;
+  unsigned char digest[SHA_LENGTH];
+  char *hash = NULL;
+  struct file *file = NULL;
+  loff_t pos = 0;
+  char file_data[READ_LENGTH];
 
   tfm = crypto_alloc_shash("sha256", 0, 0);
   if (IS_ERR(tfm)) {
-    pr_err("%s: crypto_alloc_shash failed\n", MODNAME);
+    pr_err("%s: crypto_alloc_shash failed in crypt_data\n", MODNAME);
     return NULL;
   }
-  desc = kmalloc(sizeof(struct shash_desc) + crypto_shash_descsize(tfm), GFP_KERNEL);
+  desc = kmalloc(sizeof(struct shash_desc) + crypto_shash_descsize(tfm), GFP_ATOMIC);
   if (desc == NULL) {
-    pr_err("%s: kmalloc failed for desc\n", MODNAME);
+    pr_err("%s: kmalloc failed for desc in crypt_data\n", MODNAME);
     goto exit;
   }
   desc->tfm = tfm;
 
   ret = crypto_shash_init(desc);
   if (ret < 0) {
-    pr_err("%s: crypto_shash_init failed\n", MODNAME);
+    pr_err("%s: crypto_shash_init failed in crypt_data\n", MODNAME);
     goto exit;
   }
 
-  ret = crypto_shash_update(desc, data, strlen(data));
-  if (ret < 0) {
-    pr_err("%s: crypto_shash_update failed\n", MODNAME);
-    goto exit;
-  }
+  if (is_file) {
+    file = filp_open(data, O_RDONLY, 0);
+    if (file == NULL || IS_ERR(file)) {
+      pr_err("%s: filp_open failed for %s in crypt_data\n", MODNAME, data);
+      goto exit;
+    }
 
-  digest = kmalloc(sizeof(*digest) * 32, GFP_KERNEL);
-  if (digest == NULL) {
-    pr_err("%s: kmalloc failed for buffer\n", MODNAME);
-    goto exit;
+    while ((bytes_read = kernel_read(file, file_data, sizeof(*file_data) * READ_LENGTH, &pos)) > 0) {
+      ret = crypto_shash_update(desc, file_data, bytes_read);
+      if (ret < 0) {
+        pr_err("%s: crypto_shash_update failed for file in crypt_data\n", MODNAME);
+        goto exit;
+      }
+    }
+  } else {
+    ret = crypto_shash_update(desc, data, strlen(data));
+    if (ret < 0) {
+      pr_err("%s: crypto_shash_update failed for non file in crypt_data\n", MODNAME);
+      goto exit;
+    }
   }
 
   ret = crypto_shash_final(desc, digest);
   if (ret < 0) {
-    pr_err("%s: crypto_shash_final failed\n", MODNAME);
+    pr_err("%s: crypto_shash_final failed in crypt_data\n", MODNAME);
     goto exit;
   }
-  digest[32 - 1] = '\0';
+
+  hash = kzalloc(sizeof(*hash) * 2 * SHA_LENGTH + 1, GFP_ATOMIC);
+  if (hash == NULL) {
+    pr_err("%s: kmalloc failed for hash in crypt_data\n", MODNAME);
+    goto exit;
+  }
+
+  for (i = 0; i < SHA_LENGTH; i++)
+    sprintf(&hash[i * 2], "%02x", digest[i]);
+
+  hash[2 * SHA_LENGTH] = '\0';
 
 exit:
   if (desc)
     kfree(desc);
   if (tfm)
     crypto_free_shash(tfm);
-  return digest;
+  if (file)
+    filp_close(file, NULL);
+  return hash;
 }
 
 bool check_hash(const unsigned char *data, const unsigned char *hashed) {
   // Variable Declaration
   char *out;
 
-  out = crypt_data(data);
+  out = crypt_data(data, false);
   if (out == NULL) {
     pr_err("%s: crypt_data failed\n", MODNAME);
     return -1;

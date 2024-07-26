@@ -47,7 +47,7 @@ asmlinkage long sys_reference_monitor_change_password(const char *password, cons
     goto exit;
   }
   // Update the password hash
-  tmp = crypt_data(buffer);
+  tmp = crypt_data(buffer, false);
   if (tmp == NULL) {
     pr_err("crypt_data failed in change_password\n");
     ret = -EINVAL;

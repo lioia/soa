@@ -80,7 +80,7 @@ int init_module(void) {
 
   // Reference Monitor initialization
   refmon.state = RM_OFF;
-  refmon.password_hash = kmalloc(sizeof(*refmon.password_hash) * 32, GFP_KERNEL);
+  refmon.password_hash = kmalloc(sizeof(*refmon.password_hash) * 32, GFP_ATOMIC);
   if (refmon.password_hash == NULL) {
     pr_err(KERN_ERR "failed to allocate password_hash\n");
     return -ENOMEM;
