@@ -13,6 +13,7 @@
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
 #include <linux/uio.h>
+#include <linux/version.h>
 
 #include "../reference_monitor.h"
 
@@ -44,8 +45,15 @@ struct dentry *fs_lookup(struct inode *parent_inode, struct dentry *child_dentry
   if (!(the_inode->i_state & I_NEW))
     return child_dentry;
 
-  // inode was not cached
-  inode_init_owner(&nop_mnt_idmap, the_inode, NULL, S_IFREG);
+    // inode was not cached
+#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 1, 0)
+  inode_init_owner(&nop_mnt_idmap, the_inode, NULL, S_IFDIR);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+  inode_init_owner(sb->s_user_ns, the_inode, NULL, S_IFDIR);
+#else
+  inode_init_owner(the_inode, NULL, S_IFDIR);
+#endif
+
   the_inode->i_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR | S_IWGRP | S_IXUSR | S_IXGRP | S_IXOTH;
   the_inode->i_fop = &fs_file_operations;
   the_inode->i_op = &fs_inode_ops;

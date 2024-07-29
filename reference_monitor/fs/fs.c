@@ -11,6 +11,7 @@
 #include <linux/time64.h>
 #include <linux/timekeeping.h>
 #include <linux/types.h>
+#include <linux/version.h>
 
 #include "../reference_monitor.h"
 
@@ -39,6 +40,7 @@ int fs_init(void) {
   if (unlikely(ret != 0))
     pr_err("%s: register_filesystem failed in fs_init\n", MODNAME);
 
+  pr_info("%s: fs init successful\n", MODNAME);
   return ret;
 }
 
@@ -53,6 +55,7 @@ struct dentry *fs_mount(struct file_system_type *fs_type, int flags, const char 
   if (unlikely(IS_ERR(ret)))
     pr_err("%s: mount_bdev failed in fs_mount\n", MODNAME);
 
+  pr_info("%s: fs mount successful\n", MODNAME);
   return ret;
 }
 
@@ -92,9 +95,14 @@ int fs_fill_sb(struct super_block *sb, void *data, int silent) {
     return -ENOMEM;
   }
 
-  // Set root user as owner of the FS root
-  // FIXME: linux version dependent
+// Set root user as owner of the FS root
+#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 1, 0)
   inode_init_owner(&nop_mnt_idmap, root_inode, NULL, S_IFDIR);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+  inode_init_owner(sb->s_user_ns, root_inode, NULL, S_IFDIR);
+#else
+  inode_init_owner(root_inode, NULL, S_IFDIR);
+#endif
   root_inode->i_sb = sb;
   root_inode->i_op = &fs_inode_ops;
   root_inode->i_fop = &fs_dir_operations;
@@ -103,7 +111,18 @@ int fs_fill_sb(struct super_block *sb, void *data, int silent) {
 
   // Baseline alignment of the FS timestamp to the current time
   ktime_get_real_ts64(&curr_time);
-  root_inode->__i_atime = root_inode->__i_mtime = root_inode->__i_ctime = curr_time;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 6, 0)
+  root_inode->__i_ctime = curr_time;
+#else
+  root_inode->i_ctime = curr_time;
+#endif
+#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 7, 0)
+  root_inode->__i_atime = curr_time;
+  root_inode->__i_mtime = curr_time;
+#else
+  root_inode->i_atime = curr_time;
+  root_inode->i_mtime = curr_time;
+#endif
 
   // No inode from device is needed
   // Root of fs is an in memory object
