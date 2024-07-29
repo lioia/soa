@@ -1,8 +1,6 @@
 #ifndef REFERENCE_MONITOR_H
 #define REFERENCE_MONITOR_H
 
-// Only visible when compiling in kernel-space
-#ifdef __KERNEL__
 #include <linux/spinlock_types.h>
 #include <linux/types.h>
 
@@ -22,6 +20,5 @@ struct reference_monitor {
   spinlock_t lock;                    // Lock for write operations on RCU list (add/delete)
   struct list_head list;              // Paths to monitor, in a linked list
 };
-#endif // !__KERNEL__
 
 #endif // !REFERENCE_MONITOR_H

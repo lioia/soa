@@ -104,6 +104,7 @@ struct reference_monitor_path *search_for_path_in_list(const char *path) {
   return found ? node : NULL;
 }
 
+// NOTE: look into getname in linux/fs.h
 // FIXME: not working for ~
 char *get_absolute_path_from_relative(char *rel_path) {
   struct path path;
