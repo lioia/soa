@@ -12,6 +12,6 @@ modules*
 the_reference_monitor*
 *.o
 *.o.cmd
-reference_monitor/user/user
 *.o.d
 .tmp*
+bin
