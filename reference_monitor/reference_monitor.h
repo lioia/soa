@@ -6,7 +6,7 @@
 
 #define MODNAME "REFERENCE_MONITOR"
 #define PASSWORD_MAX_LEN 128
-#define FS_PATH "/mnt/reference-monitor/fs.log"
+#define FS_PATH "/tmp/reference_monitor/mount/reference_monitor.log"
 
 struct reference_monitor_path {
   char *path;

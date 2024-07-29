@@ -8,6 +8,7 @@
 #include <linux/device.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
+#include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/kprobes.h>
@@ -24,6 +25,7 @@
 #include <linux/version.h>
 #include <linux/vmalloc.h>
 
+#include "fs/fs.h"
 #include "libs/scth.h"
 #include "probes/probes.h"
 #include "reference_monitor.h"
@@ -93,19 +95,26 @@ int init_module(void) {
   spin_lock_init(&refmon.lock);
   INIT_LIST_HEAD(&refmon.list);
 
-  probes_init();
-  probes_register();
+  ret = probes_init();
+  if (ret < 0)
+    return ret;
+
+  ret = fs_init();
+  if (ret < 0)
+    return ret;
+
   pr_info("%s: correctly initialized\n", MODNAME);
 
   return 0;
 }
 
+// FIXME: cleanup is not complete
 void cleanup_module(void) {
   // Variable Declaration
-  int i;
+  int i = 0;
 
   // Unregister probes
-  probes_unregister();
+  probes_deinit();
 
   pr_info("%s: cleanup\n", MODNAME);
 
