@@ -38,7 +38,7 @@ void write_to_log(unsigned long data) {
   }
 
   // Write to log file
-  if (kernel_write(file, line, len, &file->f_pos) != len) {
+  if (kernel_write(file, line, len, &file->f_pos) < 0) {
     pr_err("%s: kernel_write failed in write_to_log\n", MODNAME);
     pr_info("%s: %s\n", MODNAME, line);
     goto exit;
