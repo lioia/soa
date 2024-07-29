@@ -3,9 +3,8 @@
 
 #include "../utils/utils.h"
 
-void probes_init(void);
-int probes_register(void);
-void probes_unregister(void);
+int probes_init(void);
+void probes_deinit(void);
 
 // Macro for creating a probe from the function name
 // do {} while(0) is needed to ensure that it runs as a single statement

@@ -111,7 +111,9 @@ static int security_path_rename_probe_entry_handler(struct kretprobe_instance *p
 
 /*static int vfs_symlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) { return 1; }*/
 
-void probes_init(void) {
+int probes_init(void) {
+  int ret = 0;
+
   CREATE_PROBE(vfs_open);
   CREATE_PROBE(security_path_unlink);
   /*CREATE_PROBE(vfs_link);*/
@@ -120,12 +122,6 @@ void probes_init(void) {
   CREATE_PROBE(security_path_rename);
   /*CREATE_PROBE(vfs_symlink);*/
 
-  pr_info("%s: initialized probe\n", MODNAME);
-}
-
-int probes_register(void) {
-  int ret = 0;
-
   REGISTER_PROBE(vfs_open);
   REGISTER_PROBE(security_path_unlink);
   /*REGISTER_PROBE(vfs_link);*/
@@ -133,11 +129,10 @@ int probes_register(void) {
   REGISTER_PROBE(security_path_rmdir);
   REGISTER_PROBE(security_path_rename);
   /*REGISTER_PROBE(vfs_symlink);*/
-  pr_info("%s: correctly registered probes\n", MODNAME);
   return ret;
 }
 
-void probes_unregister(void) {
+void probes_deinit(void) {
   unregister_kretprobe(&vfs_open_probe);
   unregister_kretprobe(&security_path_unlink_probe);
   /*unregister_kretprobe(&vfs_link_probe);*/
