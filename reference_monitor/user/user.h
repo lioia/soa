@@ -12,6 +12,6 @@ int change_password(bool hide);
 int set_state(bool hide);
 int add_path(bool hide);
 int remove_path(bool hide);
-int print_logs(bool hide);
+int print_logs();
 
 #endif // !USER_H

@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
       ret = remove_path(hide);
       break;
     case 5:
-      ret = print_logs(hide);
+      ret = print_logs();
       break;
     case 9:
       exit(EXIT_SUCCESS);
@@ -139,7 +139,11 @@ int remove_path(bool hide) {
   return syscall(DELETE_PATH, password, path);
 }
 
-int print_logs(bool _) {
-  puts("NOT IMPLEMENTED YET");
-  return 0;
+int print_logs() {
+  char *path = "/tmp/reference_monitor/mount/reference_monitor.log";
+  if (access(path, R_OK) != 0) {
+    fprintf(stderr, "Log is not mounted\n");
+    return -1;
+  }
+  return system("cat /tmp/reference_monitor/mount/reference_monitor.log");
 }
