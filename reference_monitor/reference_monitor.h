@@ -1,12 +1,14 @@
 #ifndef REFERENCE_MONITOR_H
 #define REFERENCE_MONITOR_H
 
+#define FS_PATH "/tmp/sffs/mount/reference_monitor.log"
+
+#ifdef __KERNEL__
 #include <linux/spinlock_types.h>
 #include <linux/types.h>
 
 #define MODNAME "REFERENCE_MONITOR"
 #define PASSWORD_MAX_LEN 128
-#define FS_PATH "/tmp/reference_monitor/mount/reference_monitor.log"
 
 struct reference_monitor_path {
   char *path;
@@ -22,4 +24,5 @@ struct reference_monitor {
   struct list_head list;              // Paths to monitor, in a linked list
 };
 
+#endif // __KERNEL__
 #endif // !REFERENCE_MONITOR_H

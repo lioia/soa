@@ -13,15 +13,6 @@
 #include <linux/types.h>
 #include <linux/version.h>
 
-#include "../reference_monitor.h"
-
-struct file_system_type fs_type = {
-    .owner = THIS_MODULE,
-    .name = "singlefilefs",
-    .mount = fs_mount,
-    .kill_sb = fs_kill_sb,
-};
-
 struct super_operations fs_super_ops = {};
 struct dentry_operations fs_dentry_ops = {};
 struct inode_operations fs_inode_ops = {
@@ -32,17 +23,6 @@ struct file_operations fs_dir_operations = {
     // FIXME: linux version dependent
     .iterate_shared = fs_iterate,
 };
-
-int fs_init(void) {
-  int ret = 0;
-
-  ret = register_filesystem(&fs_type);
-  if (unlikely(ret != 0))
-    pr_err("%s: register_filesystem failed in fs_init\n", MODNAME);
-
-  pr_info("%s: fs init successful\n", MODNAME);
-  return ret;
-}
 
 void fs_kill_sb(struct super_block *s) {
   kill_block_super(s);

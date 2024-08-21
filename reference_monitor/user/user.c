@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../reference_monitor.h"
 #include "io.h"
 #include "user.h"
 
@@ -140,10 +141,21 @@ int remove_path(bool hide) {
 }
 
 int print_logs() {
-  char *path = "/tmp/reference_monitor/mount/reference_monitor.log";
-  if (access(path, R_OK) != 0) {
+  int len = 0;
+  char *cmd = NULL;
+
+  // Check if file is present
+  if (access(FS_PATH, R_OK) != 0) {
     fprintf(stderr, "Log is not mounted\n");
     return -1;
   }
-  return system("cat /tmp/reference_monitor/mount/reference_monitor.log");
+  len = snprintf(NULL, 0, "cat %s", FS_PATH);
+  cmd = malloc(sizeof(*cmd) * len);
+  if (cmd == NULL) {
+    perror("malloc failed in print_logs");
+    return EXIT_FAILURE;
+  }
+  sprintf(cmd, "cat %s", FS_PATH);
+
+  return system(cmd);
 }

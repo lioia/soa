@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 #else
+#include "../sffs.h"
 #include <linux/fs.h>
 #include <linux/types.h>
 

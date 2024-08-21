@@ -15,8 +15,6 @@
 #include <linux/uio.h>
 #include <linux/version.h>
 
-#include "../reference_monitor.h"
-
 extern struct inode_operations fs_inode_ops;
 struct file_operations fs_file_operations = {
     .owner = THIS_MODULE,

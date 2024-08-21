@@ -24,7 +24,7 @@ void write_to_log(unsigned long data) {
   line = kmalloc(sizeof(*line) * len, GFP_ATOMIC);
   if (line == NULL) {
     pr_err("%s: kmalloc for line failed in write_to_log\n", MODNAME);
-    pr_info("%s: %d,%d,%u,%u,%s,%s\n", MODNAME, work->tgid, work->tid, work->uid, work->euid, work->path, hash);
+    pr_info("%s-log: %d,%d,%u,%u,%s,%s\n", MODNAME, work->tgid, work->tid, work->uid, work->euid, work->path, hash);
     goto exit;
   }
   sprintf(line, "%d,%d,%u,%u,%s,%s\n", work->tgid, work->tid, work->uid, work->euid, work->path, hash);
@@ -33,7 +33,7 @@ void write_to_log(unsigned long data) {
   file = filp_open(FS_PATH, O_WRONLY, 0644);
   if (IS_ERR(file)) {
     pr_err("%s: filp_open failed in write_to_log (%ld)\n", MODNAME, PTR_ERR(file));
-    pr_info("%s: %s\n", MODNAME, line);
+    pr_info("%s-log: %s\n", MODNAME, line);
     goto exit;
   }
 

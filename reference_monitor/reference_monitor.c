@@ -25,15 +25,10 @@
 #include <linux/version.h>
 #include <linux/vmalloc.h>
 
-#include "fs/fs.h"
 #include "libs/scth.h"
 #include "probes/probes.h"
 #include "reference_monitor.h"
 #include "utils/utils.h"
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Alessandro Lioi <alessandro.lioi@students.uniroma2.it>");
-MODULE_DESCRIPTION("Reference Monitor");
 
 unsigned long the_syscall_table = 0x0;
 module_param(the_syscall_table, ulong, 0660);
@@ -50,7 +45,7 @@ extern long sys_reference_monitor_delete_path;
 
 struct reference_monitor refmon = {0};
 
-int init_module(void) {
+static int reference_monitor_init(void) {
   // Variable Declaration
   int i, ret;
 
@@ -99,17 +94,13 @@ int init_module(void) {
   if (ret < 0)
     return ret;
 
-  ret = fs_init();
-  if (ret < 0)
-    return ret;
-
   pr_info("%s: correctly initialized\n", MODNAME);
 
   return 0;
 }
 
 // FIXME: cleanup is not complete
-void cleanup_module(void) {
+static void reference_monitor_cleanup(void) {
   // Variable Declaration
   int i = 0;
 
@@ -130,3 +121,10 @@ void cleanup_module(void) {
 
   pr_info("%s: sys-call table restored to its original content\n", MODNAME);
 }
+
+module_init(reference_monitor_init);
+module_exit(reference_monitor_cleanup);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Alessandro Lioi <alessandro.lioi@students.uniroma2.it>");
+MODULE_DESCRIPTION("Reference Monitor");
