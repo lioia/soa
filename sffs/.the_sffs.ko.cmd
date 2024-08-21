@@ -1,1 +1,0 @@
-cmd_/home/lioia/soa/sffs/the_sffs.ko := ld -r -m elf_x86_64 -z noexecstack --build-id=sha1  -T scripts/module.lds -o /home/lioia/soa/sffs/the_sffs.ko /home/lioia/soa/sffs/the_sffs.o /home/lioia/soa/sffs/the_sffs.mod.o;  true
