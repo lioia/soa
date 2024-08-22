@@ -1,10 +1,9 @@
 #ifndef PROBES_H
 #define PROBES_H
 
-#include "../utils/utils.h"
-
-int probes_init(void);
-void probes_deinit(void);
+void probes_init(void);
+int probes_register(void);
+void probes_unregister(void);
 
 // Macro for creating a probe from the function name
 // do {} while(0) is needed to ensure that it runs as a single statement
@@ -23,33 +22,4 @@ void probes_deinit(void);
     return ret;                                                                                                        \
   }
 
-#define HANDLE_PROBE(dentry_expr)                                                                                      \
-  do {                                                                                                                 \
-    int ret = 1;                                                                                                       \
-    char *path = NULL;                                                                                                 \
-    struct dentry *dentry = NULL;                                                                                      \
-    struct reference_monitor_path *entry = NULL;                                                                       \
-                                                                                                                       \
-    if (refmon.state == RM_OFF || refmon.state == RM_REC_OFF)                                                          \
-      return ret;                                                                                                      \
-                                                                                                                       \
-    dentry = dentry_expr;                                                                                              \
-                                                                                                                       \
-    /* Get path from dentry */                                                                                         \
-    path = get_complete_path_from_dentry(dentry);                                                                      \
-    /* Search for the path in the rcu list */                                                                          \
-    entry = search_for_path_in_list(path);                                                                             \
-                                                                                                                       \
-    /* No entry found; */                                                                                              \
-    if (entry == NULL)                                                                                                 \
-      goto exit;                                                                                                       \
-                                                                                                                       \
-    /* Entry found; post handler has to be activated */                                                                \
-    ret = 0;                                                                                                           \
-                                                                                                                       \
-  exit:                                                                                                                \
-    if (path)                                                                                                          \
-      kfree(path);                                                                                                     \
-    return ret;                                                                                                        \
-  } while (0)
 #endif // !PROBES_H
