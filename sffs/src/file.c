@@ -1,4 +1,5 @@
 #include "fs.h"
+#include "linux/wait.h"
 
 #include <asm-generic/fcntl.h>
 #include <linux/buffer_head.h>
@@ -132,44 +133,24 @@ int fs_open(struct inode *inode, struct file *file) {
 }
 
 ssize_t fs_write_iter(struct kiocb *iocb, struct iov_iter *from) {
-  struct file *file = NULL;
-  loff_t file_size = 0, offset = 0, offset_in_block = 0;
-  size_t bytes_to_write = 0;
-  ssize_t ret = 0;
-  void *buffer = NULL;
-  int current_block = 0;
+  struct file *file = iocb->ki_filp;
   struct buffer_head *bh = NULL;
+  loff_t file_size = i_size_read(file_inode(file));
+  loff_t offset_in_block = file_size;
+  size_t bytes_to_write = iov_iter_count(from);
+  size_t remaining_bytes = bytes_to_write;
+  int current_block = 0;
+  ssize_t ret = 0;
+
+  current_block = file_size / DEFAULT_BLOCK_SIZE + 2; // + 2 is for superblock + inode
+  offset_in_block = file_size % DEFAULT_BLOCK_SIZE;   // offset inside the current block
+
+  // Write crosses block boundaries
+  if (bytes_to_write > DEFAULT_BLOCK_SIZE - offset_in_block)
+    remaining_bytes = DEFAULT_BLOCK_SIZE - offset_in_block;
 
   // Lock operations
   mutex_lock(&fs_lock);
-
-  file = iocb->ki_filp;
-  file_size = i_size_read(file_inode(file));
-  offset = file_size;
-  bytes_to_write = from->count;
-
-  buffer = kmalloc(bytes_to_write, GFP_ATOMIC);
-  if (buffer == NULL) {
-    pr_err("%s: kmalloc for buffer failed in fs_write_iter\n", MODNAME);
-    ret = -ENOMEM;
-    goto exit;
-  }
-
-  if (_copy_from_iter(buffer, bytes_to_write, from) != bytes_to_write) {
-    pr_err("%s: _copy_from_iter failed in fs_write_iter\n", MODNAME);
-    ret = -EFAULT;
-    goto exit;
-  }
-
-  offset_in_block = offset % DEFAULT_BLOCK_SIZE;   // offset inside the current block
-  current_block = offset / DEFAULT_BLOCK_SIZE + 2; // + 2 is for superblock + inode
-
-  // Write crosses block boundaries
-  if (bytes_to_write > DEFAULT_BLOCK_SIZE - offset_in_block) {
-    current_block += 1;                               // go to next block
-    offset += (DEFAULT_BLOCK_SIZE - offset_in_block); // offset at start of new block
-    offset_in_block = 0;
-  }
 
   // Get buffer head for the block
   bh = sb_bread(file->f_path.dentry->d_inode->i_sb, current_block);
@@ -179,26 +160,25 @@ ssize_t fs_write_iter(struct kiocb *iocb, struct iov_iter *from) {
     goto exit;
   }
 
-  // Copy data from temp buffer to buffer head
-  memcpy(bh->b_data + offset_in_block, buffer, bytes_to_write);
+  ret = copy_from_iter(bh->b_data + offset_in_block, remaining_bytes, from);
+  if (ret != bytes_to_write) {
+    pr_err("%s: copy_from_iter failed in fs_write_iter\n", MODNAME);
+    ret = -EFAULT;
+    goto exit;
+  }
 
   // Needs to be flushed
   mark_buffer_dirty(bh);
+  sync_dirty_buffer(bh);
 
-  // Update file size
-  if (file_size < offset + bytes_to_write)
-    i_size_write(file_inode(file), offset + bytes_to_write);
-
-  // Update file position
-  offset += bytes_to_write;
-  file->f_pos = offset;
+  i_size_write(file_inode(file), ret);
+  mark_inode_dirty(file_inode(file));
+  iocb->ki_pos += ret;
 
 exit:
   // Unlock
   if (bh)
     brelse(bh);
   mutex_unlock(&fs_lock);
-  if (buffer)
-    kfree(buffer);
   return ret;
 }

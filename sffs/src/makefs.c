@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
             (int)sizeof(file_inode));
     goto exit;
   }
-  puts("SuperBlock written successfully");
+  puts("File Inode written successfully");
 
   // Padding for block 1
   nbytes = DEFAULT_BLOCK_SIZE - sizeof(file_inode);
