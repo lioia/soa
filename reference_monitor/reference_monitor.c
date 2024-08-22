@@ -77,7 +77,7 @@ static int reference_monitor_init(void) {
 
   // Reference Monitor initialization
   refmon.state = RM_OFF;
-  refmon.password_hash = kmalloc(sizeof(*refmon.password_hash) * 32, GFP_ATOMIC);
+  refmon.password_hash = kmalloc(sizeof(*refmon.password_hash) * SHA_LENGTH, GFP_ATOMIC);
   if (refmon.password_hash == NULL) {
     pr_err(KERN_ERR "failed to allocate password_hash\n");
     return -ENOMEM;
@@ -89,10 +89,7 @@ static int reference_monitor_init(void) {
   }
   spin_lock_init(&refmon.lock);
   INIT_LIST_HEAD(&refmon.list);
-
-  ret = probes_init();
-  if (ret < 0)
-    return ret;
+  probes_init();
 
   pr_info("%s: correctly initialized\n", MODNAME);
 
@@ -104,8 +101,10 @@ static void reference_monitor_cleanup(void) {
   // Variable Declaration
   int i = 0;
 
-  // Unregister probes
-  probes_deinit();
+  // Reference Monitor Cleanup
+  kfree(refmon.password_hash);
+  if (refmon.state == RM_ON || refmon.state == RM_REC_ON)
+    probes_unregister();
 
   pr_info("%s: cleanup\n", MODNAME);
 
@@ -115,9 +114,6 @@ static void reference_monitor_cleanup(void) {
     ((unsigned long *)the_syscall_table)[restore[i]] = the_ni_syscall;
   }
   protect_memory();
-
-  // Reference Monitor Cleanup
-  kfree(refmon.password_hash);
 
   pr_info("%s: sys-call table restored to its original content\n", MODNAME);
 }

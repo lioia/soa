@@ -11,7 +11,7 @@
 #define PASSWORD_MAX_LEN 128
 
 struct reference_monitor_path {
-  char *path;
+  unsigned long i_ino;
   struct list_head next;
 };
 
