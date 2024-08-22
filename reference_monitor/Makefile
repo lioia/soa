@@ -1,13 +1,13 @@
 obj-m += the_reference_monitor.o
-the_reference_monitor-objs += reference_monitor.o libs/scth.o \
-	probes/probes.o utils/syscall.o utils/utils.o tasks/tasks.o
+the_reference_monitor-objs += reference_monitor.o libs/scth.o probes/probes.o \
+	utils/syscall.o utils/paths.o utils/crypto.o utils/credentials.o tasks/tasks.o
 
-all: reference_monitor_module reference_monitor_user
+CFLAGS_MODULE := -g
 
-reference_monitor_module:
+all: clean build mount
+
+build:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
-
-reference_monitor_user:
 	mkdir -p bin
 	$(CC) -Wall -Wextra -o bin/user user/user.c user/io.c
 
