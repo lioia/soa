@@ -11,16 +11,17 @@ void write_to_log(unsigned long data) {
   struct reference_monitor_packed_work *work = NULL;
   char *hash = NULL, *line = NULL;
   struct file *file = NULL;
-  size_t len = 0;
+  size_t len = 0, remaining = 0, written = 0, offset = 0;
 
   // Get the work
   work = container_of((void *)data, struct reference_monitor_packed_work, the_work);
 
   // Calculate hash of offending program contents
-  hash = crypt_data(work->path, true);
+  hash = crypt_data(work->path, true); // TODO: error checking
 
   // Create output string
   len = snprintf(NULL, 0, "%d,%d,%u,%u,%s,%s\n", work->tgid, work->tid, work->uid, work->euid, work->path, hash);
+  remaining = len;
   line = kmalloc(sizeof(*line) * len, GFP_ATOMIC);
   if (line == NULL) {
     pr_err("%s: kmalloc for line failed in write_to_log\n", MODNAME);
@@ -38,18 +39,24 @@ void write_to_log(unsigned long data) {
   }
 
   // Write to log file
-  if (kernel_write(file, line, len, &file->f_pos) < 0) {
-    pr_err("%s: kernel_write failed in write_to_log\n", MODNAME);
-    pr_info("%s: %s\n", MODNAME, line);
-    goto exit;
+  while (remaining > 0) {
+    written = kernel_write(file + offset, line, remaining, &file->f_pos);
+    if (written < 0) {
+      pr_err("%s: kernel_write failed in write_to_log\n", MODNAME);
+      pr_info("%s: %s\n", MODNAME, line);
+      goto exit;
+    }
+    remaining -= written;
+    offset += written;
   }
 
 exit:
   // Freeing work structure
-  kfree(work->path);
-  kfree(work);
+  if (work->path)
+    kfree(work->path);
   if (file && !IS_ERR(file))
     filp_close(file, NULL);
   if (line)
     kfree(line);
+  kfree(work);
 }
