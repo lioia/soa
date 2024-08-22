@@ -11,7 +11,9 @@
 #include <linux/uidgid.h>
 #include <linux/version.h>
 
+#include "../probes/probes.h"
 #include "../reference_monitor.h"
+#include "linux/path.h"
 #include "utils.h"
 
 extern struct reference_monitor refmon;
@@ -89,6 +91,10 @@ asmlinkage long sys_reference_monitor_set_state(const char *password, int state)
 
   // Update state
   // FIXME: adhere to specs for state change
+  if ((refmon.state == RM_OFF || refmon.state == RM_REC_OFF) && (state == RM_ON || state == RM_REC_ON))
+    ret = probes_register();
+  else if ((refmon.state == RM_ON || refmon.state == RM_REC_ON) && (state == RM_OFF || state == RM_REC_OFF))
+    probes_unregister();
   refmon.state = state;
 
 exit:
@@ -103,12 +109,13 @@ long sys_reference_monitor_set_state = (unsigned long)__x64_sys_reference_monito
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-__SYSCALL_DEFINEx(2, _reference_monitor_add_path, const char *, password, const char *, path) {
+__SYSCALL_DEFINEx(2, _reference_monitor_add_path, const char *, password, const char *, path_name) {
 #else
-asmlinkage long sys_reference_monitor_add_path(const char *password, const char *path) {
+asmlinkage long sys_reference_monitor_add_path(const char *password, const char *path_name) {
 #endif
-  char *buffer = NULL, *absolute_path = NULL;
+  char *buffer = NULL;
   struct reference_monitor_path *node = NULL;
+  struct dentry *dentry = NULL;
   long ret = 0;
 
   pr_info(KERN_INFO "%s: add_path\n", MODNAME);
@@ -116,57 +123,58 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   buffer = (char *)__get_free_page(GFP_ATOMIC);
   if (buffer == NULL) {
     pr_err("%s: get_free_page failed for buffer in syscall add_path\n", MODNAME);
-    ret = -ENOMEM;
-    goto exit_error;
+    return -ENOMEM;
   }
   // Check if root and provided password is correct
   if ((ret = is_root_and_correct_password(buffer, password)) < 0)
-    return ret;
+    goto exit;
 
   // Check if it can be reconfigures
   if (refmon.state != RM_REC_ON && refmon.state != RM_REC_OFF) {
     pr_info("%s: state does not allow to reconfigure\n", MODNAME);
-    return -EPERM;
+    ret = -EPERM;
+    goto exit;
   }
 
+  clear_page(buffer);
+
   // Copy provided path from user to buffer
-  if ((ret = copy_from_user(buffer, path, PATH_MAX)) < 0) {
+  if ((ret = copy_from_user(buffer, path_name, PATH_MAX)) < 0) {
     pr_err("%s: copy_from_user for path failed in syscall add_path\n", MODNAME);
     ret = -EINVAL;
-    goto exit_error;
+    goto exit;
   }
 
   // Setting the path to the buffer
-  absolute_path = get_absolute_path_from_relative(buffer);
-  if (absolute_path == NULL) {
+  dentry = get_dentry_from_pathname(buffer);
+  if (dentry == NULL) {
+    pr_err("%s: get_dentry_from_pathname failed in syscall add_path\n", MODNAME);
     ret = -EINVAL;
-    goto exit_error;
+    goto exit;
   }
+
   // Search for node in the rcu list
-  node = search_for_path_in_list(absolute_path);
+  node = search_for_path_in_list(dentry);
   // Node found, so the path is already in the list
   if (node != NULL) {
     pr_info("%s: path already in list in syscall add_path\n", MODNAME);
-    goto exit_error;
+    goto exit;
   }
   // Node not found; creating new one
   node = kmalloc(sizeof(*node), GFP_ATOMIC);
   if (node == NULL) {
     pr_err("%s: kmalloc for node failed in syscall add_path\n", MODNAME);
     ret = -ENOMEM;
-    goto exit_error;
+    goto exit;
   }
-  node->path = absolute_path;
+
+  node->i_ino = dentry->d_inode->i_ino;
 
   // Adding the node in an atomic way to the rcu list
   spin_lock(&refmon.lock);
   list_add_rcu(&node->next, &refmon.list);
   spin_unlock(&refmon.lock);
-  goto exit;
 
-exit_error: // On error or node found
-  if (absolute_path)
-    kfree(absolute_path);
 exit: // On correct insertion
   if (buffer)
     free_page((unsigned long)buffer);
@@ -184,6 +192,7 @@ __SYSCALL_DEFINEx(2, _reference_monitor_delete_path, const char *, password, con
 asmlinkage long sys_reference_monitor_delete_path(const char *password, const char *path) {
 #endif
   char *buffer = NULL;
+  struct dentry *dentry = NULL;
   struct reference_monitor_path *node = NULL;
   long ret = 0;
 
@@ -192,18 +201,19 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
   buffer = (char *)__get_free_page(GFP_ATOMIC);
   if (buffer == NULL) {
     pr_err("%s: get_free_page for buffer failed in syscall delete_path\n", MODNAME);
-    ret = -ENOMEM;
-    goto exit;
+    return -ENOMEM;
   }
   // Check if root and password provided is correct
   if ((ret = is_root_and_correct_password(buffer, password)) < 0)
-    return ret;
+    goto exit;
 
   // Check if it can be reconfigured
   if (refmon.state != RM_REC_ON && refmon.state != RM_REC_OFF) {
     pr_info("%s: state does not allow to reconfigure\n", MODNAME);
     return -EPERM;
   }
+
+  clear_page(buffer);
 
   // Copy provided path into buffer
   if ((ret = copy_from_user(buffer, path, PATH_MAX)) < 0) {
@@ -212,7 +222,14 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
     goto exit;
   }
   // Search for node in the rcu list
-  node = search_for_path_in_list(buffer);
+  dentry = get_dentry_from_pathname(buffer);
+  if (ret != 0) {
+    pr_err("%s: get_dentry_from_path failed in syscall add_path\n", MODNAME);
+    ret = -EINVAL;
+    goto exit;
+  }
+
+  node = search_for_path_in_list(dentry);
 
   // If found, remove from the list
   if (node) {
