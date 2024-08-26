@@ -36,7 +36,7 @@ bool is_euid_root(void);
 int is_root_and_correct_password(char *buffer, const char *password);
 
 // Reference Monitor search
-struct reference_monitor_path *search_for_path_in_list(struct dentry *dentry);
-bool is_dentry_protected(struct dentry *dentry);
+struct reference_monitor_path *search_for_path_in_list(unsigned long i_ino);
+bool is_file_or_parent_protected(struct dentry *dentry);
 
 #endif // !UTILS_H

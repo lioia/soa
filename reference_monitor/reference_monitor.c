@@ -90,10 +90,15 @@ static int reference_monitor_init(void) {
   spin_lock_init(&refmon.lock);
   INIT_LIST_HEAD(&refmon.list);
   probes_init();
+  ret = probes_disable();
+  if (ret != 0) {
+    pr_info("%s: probes_disable failed\n", MODNAME);
+    return ret;
+  }
 
   pr_info("%s: correctly initialized\n", MODNAME);
 
-  return 0;
+  return ret;
 }
 
 // FIXME: cleanup is not complete
@@ -104,7 +109,7 @@ static void reference_monitor_cleanup(void) {
   // Reference Monitor Cleanup
   kfree(refmon.password_hash);
   if (refmon.state == RM_ON || refmon.state == RM_REC_ON)
-    probes_unregister();
+    probes_deinit();
 
   pr_info("%s: cleanup\n", MODNAME);
 

@@ -25,26 +25,15 @@
 // TODO: add in kretprobe_instance data the filename trying to access
 // TODO: add the filename to the work struct and log it
 
-// File create/edit
-struct kretprobe vfs_open_probe;
-
-// File delete
-struct kretprobe security_path_unlink_probe;
-
-// File link
-struct kretprobe security_inode_link_probe;
-
-// Directory create
-struct kretprobe security_path_mkdir_probe;
-
-// Directory delete
-struct kretprobe security_path_rmdir_probe;
-
-// Directory edit (file move)
-struct kretprobe security_path_rename_probe;
-
-// Symbolic Link
-struct kretprobe security_inode_symlink_probe;
+// File edit
+struct kretprobe vfs_open_probe;               // File Edit
+struct kretprobe security_inode_create_probe;  // File Create
+struct kretprobe security_path_unlink_probe;   // File Delete
+struct kretprobe security_inode_link_probe;    // File Link
+struct kretprobe security_path_mkdir_probe;    // Directory Create
+struct kretprobe security_path_rmdir_probe;    // Directory Delete
+struct kretprobe security_path_rename_probe;   // File/Directory Move
+struct kretprobe security_inode_symlink_probe; // Symbolic Link
 
 // The post handler is executed only if the entry handler returns 0;
 // it sets the return value of the syscall to an error value (EACCES) and it
@@ -77,49 +66,72 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
   /*exit:*/
   // Set return value of the function to EACCES
   regs_set_return_value(regs, -EACCES);
+  regs->ax = (unsigned long)-EACCES;
   return 0;
 }
 
-// nt vfs_open(const struct path *, struct file *);
+// int vfs_open(const struct path *, struct file *);
 static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
   struct path *path = (struct path *)regs->di;
   struct file *file = (struct file *)regs->si;
-  // If any of the writing flags are set, check the file
-  if ((file->f_flags & O_WRONLY) || (file->f_flags & O_RDWR) || (file->f_flags & O_CREAT) ||
-      (file->f_flags & O_APPEND) || (file->f_flags & O_TRUNC)) {
-    return !is_dentry_protected(path->dentry);
-  }
 
   // File opened in read mode
-  return 1;
+  if (!(file->f_flags & O_WRONLY) && !(file->f_flags & O_RDWR) && !(file->f_flags & O_APPEND) &&
+      !(file->f_flags & O_TRUNC) && !(file->f_flags & O_CREAT))
+    return 1;
+
+  // File opened in write mode
+  return !is_file_or_parent_protected(path->dentry);
+}
+
+// int security_inode_create(struct inode *dir, struct dentry *dentry, umode_t mode);
+static int security_inode_create_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
+  struct inode *dir = (struct inode *)regs->di;
+  struct reference_monitor_path *node = search_for_path_in_list(dir->i_ino);
+  return node == NULL;
 }
 
 // int security_path_symlink(const struct path *dir, struct dentry *dentry, const char *old_name)
 static int security_path_unlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  struct dentry *dentry = (struct dentry *)regs->si;
-  return !is_dentry_protected(dentry);
+  struct path *parent_path = (struct path *)regs->di;
+  struct dentry *new_dentry = (struct dentry *)regs->si;
+
+  bool parent_protected = is_file_or_parent_protected(parent_path->dentry);
+  bool new_protected = is_file_or_parent_protected(new_dentry);
+
+  return !(parent_protected || new_protected);
 }
 
 // int security_inode_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_dentry)
 static int security_inode_link_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
   struct dentry *old_dentry = (struct dentry *)regs->di;
   struct dentry *new_dentry = (struct dentry *)regs->dx;
-  bool old_protected = is_dentry_protected(old_dentry);
-  bool new_protected = is_dentry_protected(new_dentry);
+  bool old_protected = is_file_or_parent_protected(old_dentry);
+  bool new_protected = is_file_or_parent_protected(new_dentry);
 
   return !(old_protected || new_protected);
 }
 
 // int security_path_mkdir(const struct path *dir, struct dentry *dentry, umode_t mode)
 static int security_path_mkdir_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  struct dentry *dentry = (struct dentry *)regs->si;
-  return !is_dentry_protected(dentry);
+  struct path *parent_path = (struct path *)regs->di;
+  struct dentry *new_dentry = (struct dentry *)regs->si;
+
+  bool parent_protected = is_file_or_parent_protected(parent_path->dentry);
+  bool new_protected = is_file_or_parent_protected(new_dentry);
+
+  return !(parent_protected || new_protected);
 }
 
 // int security_path_rmdir(const struct path *dir, struct dentry *dentry)
 static int security_path_rmdir_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  struct dentry *dentry = (struct dentry *)regs->si;
-  return !is_dentry_protected(dentry);
+  struct path *parent_path = (struct path *)regs->di;
+  struct dentry *new_dentry = (struct dentry *)regs->si;
+
+  bool parent_protected = is_file_or_parent_protected(parent_path->dentry);
+  bool new_protected = is_file_or_parent_protected(new_dentry);
+
+  return !(parent_protected || new_protected);
 }
 
 // int security_path_rename(const struct path *old_dir, struct dentry *old_dentry,
@@ -128,8 +140,8 @@ static int security_path_rmdir_probe_entry_handler(struct kretprobe_instance *p,
 static int security_path_rename_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
   struct dentry *old_dentry = (struct dentry *)regs->si;
   struct dentry *new_dentry = (struct dentry *)regs->cx;
-  bool old_protected = is_dentry_protected(old_dentry);
-  bool new_protected = is_dentry_protected(new_dentry);
+  bool old_protected = is_file_or_parent_protected(old_dentry);
+  bool new_protected = is_file_or_parent_protected(new_dentry);
 
   return !(old_protected || new_protected);
 }
@@ -147,27 +159,27 @@ static int security_inode_symlink_probe_entry_handler(struct kretprobe_instance 
       return 0; // Path not found; nothing to do
   }
 
-  old_protected = is_dentry_protected(old_path.dentry);
-  new_protected = is_dentry_protected(new_dentry);
+  old_protected = is_file_or_parent_protected(old_path.dentry);
+  new_protected = is_file_or_parent_protected(new_dentry);
 
   path_put(&old_path);
   return !(old_protected || new_protected);
 }
 
-void probes_init(void) {
+int probes_init(void) {
+  int ret = 0;
+
   CREATE_PROBE(vfs_open);
+  CREATE_PROBE(security_inode_create);
   CREATE_PROBE(security_path_unlink);
   CREATE_PROBE(security_inode_link);
   CREATE_PROBE(security_path_mkdir);
   CREATE_PROBE(security_path_rmdir);
   CREATE_PROBE(security_path_rename);
   CREATE_PROBE(security_inode_symlink);
-}
-
-int probes_register(void) {
-  int ret = 0;
 
   REGISTER_PROBE(vfs_open);
+  REGISTER_PROBE(security_inode_create);
   REGISTER_PROBE(security_path_unlink);
   REGISTER_PROBE(security_inode_link);
   REGISTER_PROBE(security_path_mkdir);
@@ -177,8 +189,9 @@ int probes_register(void) {
   return ret;
 }
 
-void probes_unregister(void) {
+void probes_deinit(void) {
   unregister_kretprobe(&vfs_open_probe);
+  unregister_kretprobe(&security_inode_create_probe);
   unregister_kretprobe(&security_path_unlink_probe);
   unregister_kretprobe(&security_inode_link_probe);
   unregister_kretprobe(&security_path_mkdir_probe);
@@ -187,4 +200,32 @@ void probes_unregister(void) {
   unregister_kretprobe(&security_inode_symlink_probe);
 
   pr_info("%s: correctly unregistered probes\n", MODNAME);
+}
+
+int probes_enable(void) {
+  int ret = 0;
+
+  ENABLE_PROBE(vfs_open);
+  ENABLE_PROBE(security_inode_create);
+  ENABLE_PROBE(security_path_unlink);
+  ENABLE_PROBE(security_inode_link);
+  ENABLE_PROBE(security_path_mkdir);
+  ENABLE_PROBE(security_path_rmdir);
+  ENABLE_PROBE(security_path_rename);
+  ENABLE_PROBE(security_inode_symlink);
+  return ret;
+}
+
+int probes_disable(void) {
+  int ret = 0;
+
+  DISABLE_PROBE(vfs_open);
+  DISABLE_PROBE(security_inode_create);
+  DISABLE_PROBE(security_path_unlink);
+  DISABLE_PROBE(security_inode_link);
+  DISABLE_PROBE(security_path_mkdir);
+  DISABLE_PROBE(security_path_rmdir);
+  DISABLE_PROBE(security_path_rename);
+  DISABLE_PROBE(security_inode_symlink);
+  return ret;
 }

@@ -92,9 +92,13 @@ asmlinkage long sys_reference_monitor_set_state(const char *password, int state)
   // Update state
   // FIXME: adhere to specs for state change
   if ((refmon.state == RM_OFF || refmon.state == RM_REC_OFF) && (state == RM_ON || state == RM_REC_ON))
-    ret = probes_register();
+    ret = probes_enable();
   else if ((refmon.state == RM_ON || refmon.state == RM_REC_ON) && (state == RM_OFF || state == RM_REC_OFF))
-    probes_unregister();
+    ret = probes_disable();
+  if (ret != 0) {
+    pr_info("%s: probes enable/disable failed\n", MODNAME);
+    goto exit;
+  }
   refmon.state = state;
 
 exit:
@@ -154,7 +158,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   }
 
   // Search for node in the rcu list
-  node = search_for_path_in_list(dentry);
+  node = search_for_path_in_list(dentry->d_inode->i_ino);
   // Node found, so the path is already in the list
   if (node != NULL) {
     pr_info("%s: path already in list in syscall add_path\n", MODNAME);
@@ -229,7 +233,7 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
     goto exit;
   }
 
-  node = search_for_path_in_list(dentry);
+  node = search_for_path_in_list(dentry->d_inode->i_ino);
 
   // If found, remove from the list
   if (node) {

@@ -27,11 +27,11 @@ exit:
 }
 
 // Search for path in the rcu list
-struct reference_monitor_path *search_for_path_in_list(struct dentry *dentry) {
+struct reference_monitor_path *search_for_path_in_list(unsigned long i_ino) {
   struct reference_monitor_path *node = NULL, *ret = NULL;
   rcu_read_lock();
   list_for_each_entry_rcu(node, &refmon.list, next) {
-    if (node->i_ino == dentry->d_inode->i_ino) {
+    if (node->i_ino == i_ino) {
       ret = node;
       break;
     }
@@ -41,21 +41,23 @@ struct reference_monitor_path *search_for_path_in_list(struct dentry *dentry) {
 }
 
 // Returns true if dentry (or parent) is protected
-bool is_dentry_protected(struct dentry *dentry) {
+bool is_file_or_parent_protected(struct dentry *dentry) {
   struct reference_monitor_path *node = NULL;
 
   // Searching current dentry
   if (d_is_negative(dentry))
     return false;
 
-  node = search_for_path_in_list(dentry);
+  node = search_for_path_in_list(dentry->d_inode->i_ino);
   if (node != NULL)
     return true;
 
   // Searching parent dentry
-  if (d_is_negative(dentry->d_parent))
+  if (d_is_negative(dentry->d_parent)) {
+    pr_info("parent for %s is invalid", dentry->d_name.name);
     return false;
-  node = search_for_path_in_list(dentry->d_parent);
+  }
+  node = search_for_path_in_list(dentry->d_parent->d_inode->i_ino);
   if (node != NULL)
     return true;
 
