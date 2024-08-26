@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "fs.h"
@@ -12,8 +13,10 @@ int main(int argc, char *argv[]) {
   struct fs_inode file_inode;
   char *block_padding;
 
+  char *file_body = "Operation,TGID,TID,UID,EUID,Primary File Path,Secondary File Path,Program Path,Program Hash\n";
+
   if (argc != 2) {
-    printf("Usages: %s <device>\n", argv[0]);
+    printf("Usage: %s <device>\n", argv[0]);
     return EXIT_FAILURE;
   }
 
@@ -39,7 +42,7 @@ int main(int argc, char *argv[]) {
   // File inode
   file_inode.mode = S_IFREG;
   file_inode.inode_no = FS_FILE_INODE_NUMBER;
-  file_inode.file_size = 0;
+  file_inode.file_size = strlen(file_body);
 
   ret = write(fd, (char *)&file_inode, sizeof(file_inode));
   if (ret != sizeof(file_inode)) {
@@ -63,6 +66,13 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Padding was not written properly; written %d bytes, expected %d\n", ret, nbytes);
     goto exit;
   }
+
+  ret = write(fd, file_body, file_inode.file_size);
+  if (ret != (int)file_inode.file_size) {
+    fprintf(stderr, "File datablock was not written property; written %d bytes, expected %d\n", ret, nbytes);
+    goto exit;
+  }
+
   // No error
   ret = 0;
 

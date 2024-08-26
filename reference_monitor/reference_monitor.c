@@ -82,7 +82,9 @@ static int reference_monitor_init(void) {
     pr_err(KERN_ERR "failed to allocate password_hash\n");
     return -ENOMEM;
   }
-  refmon.password_hash = crypt_data("reference_monitor_default_password");
+  refmon.password_hash = crypt_data("1", false);
+  /* TODO: Restore */
+  /*  refmon.password_hash = crypt_data("refmon_default", false);*/
   if (refmon.password_hash == NULL) {
     pr_err(KERN_ERR "failed to crypt_data for default password\n");
     return -ENOMEM;
