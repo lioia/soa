@@ -12,7 +12,7 @@ void write_to_log(unsigned long data) {
   char *hash = NULL, *line = NULL;
   struct file *file = NULL;
   char *primary_file_path = NULL, *secondary_file_path;
-  size_t len = 0, remaining = 0, written = 0, offset = 0;
+  size_t len = 0;
 
   // Get the work
   work = container_of((void *)data, struct reference_monitor_packed_work, the_work);
@@ -37,7 +37,7 @@ void write_to_log(unsigned long data) {
                  "Secondary File Path: %s\nProgram Hash: %s\n\n",
                  work->operation, work->tgid, work->tid, work->uid, work->euid, primary_file_path, secondary_file_path,
                  work->program_path, hash);
-  remaining = len;
+
   line = kmalloc(sizeof(*line) * len, GFP_ATOMIC);
   if (line == NULL) {
     pr_err("%s: kmalloc for line failed in write_to_log\n", MODNAME);
@@ -63,15 +63,10 @@ void write_to_log(unsigned long data) {
   }
 
   // Write to log file
-  while (remaining > 0) {
-    written = kernel_write(file + offset, line, remaining, &file->f_pos);
-    if (written < 0) {
-      pr_err("%s: kernel_write failed in write_to_log\n", MODNAME);
-      pr_info("%s-log: %s\n", MODNAME, line);
-      goto exit;
-    }
-    remaining -= written;
-    offset += written;
+  if (kernel_write(file, line, len, &file->f_pos) < 0) {
+    pr_err("%s: kernel_write failed in write_to_log\n", MODNAME);
+    pr_info("%s-log: %s\n", MODNAME, line);
+    goto exit;
   }
 
 exit:

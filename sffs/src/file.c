@@ -1,5 +1,4 @@
 #include "fs.h"
-#include "linux/wait.h"
 
 #include <asm-generic/fcntl.h>
 #include <linux/buffer_head.h>
@@ -139,8 +138,12 @@ ssize_t fs_write_iter(struct kiocb *iocb, struct iov_iter *from) {
   loff_t offset_in_block = file_size;
   size_t bytes_to_write = iov_iter_count(from);
   size_t remaining_bytes = bytes_to_write;
+  void *buffer = NULL;
   int current_block = 0;
   ssize_t ret = 0;
+
+  // Lock operations
+  mutex_lock(&fs_lock);
 
   current_block = file_size / DEFAULT_BLOCK_SIZE + 2; // + 2 is for superblock + inode
   offset_in_block = file_size % DEFAULT_BLOCK_SIZE;   // offset inside the current block
@@ -149,8 +152,24 @@ ssize_t fs_write_iter(struct kiocb *iocb, struct iov_iter *from) {
   if (bytes_to_write > DEFAULT_BLOCK_SIZE - offset_in_block)
     remaining_bytes = DEFAULT_BLOCK_SIZE - offset_in_block;
 
-  // Lock operations
-  mutex_lock(&fs_lock);
+  buffer = kmalloc(bytes_to_write, GFP_ATOMIC);
+  if (buffer == NULL) {
+    pr_err("%s: kmalloc for buffer failed in fs_write_iter\n", MODNAME);
+    ret = -ENOMEM;
+    goto exit;
+  }
+
+  if (copy_from_iter(buffer, bytes_to_write, from) != bytes_to_write) {
+    pr_err("%s: copy_from_iter failed in fs_write_iter\n", MODNAME);
+    ret = -EFAULT;
+    goto exit;
+  }
+
+  // Write crosses block boundaries
+  if (bytes_to_write > DEFAULT_BLOCK_SIZE - offset_in_block) {
+    current_block += 1; // go to next block
+    offset_in_block = 0;
+  }
 
   // Get buffer head for the block
   bh = sb_bread(file->f_path.dentry->d_inode->i_sb, current_block);
@@ -160,25 +179,23 @@ ssize_t fs_write_iter(struct kiocb *iocb, struct iov_iter *from) {
     goto exit;
   }
 
-  ret = copy_from_iter(bh->b_data + offset_in_block, remaining_bytes, from);
-  if (ret != bytes_to_write) {
-    pr_err("%s: copy_from_iter failed in fs_write_iter\n", MODNAME);
-    ret = -EFAULT;
-    goto exit;
-  }
+  // Copy data from temp buffer to buffer head
+  memcpy(bh->b_data + offset_in_block, buffer, bytes_to_write);
 
   // Needs to be flushed
   mark_buffer_dirty(bh);
   sync_dirty_buffer(bh);
 
-  i_size_write(file_inode(file), ret);
+  i_size_write(file_inode(file), file_size + bytes_to_write);
   mark_inode_dirty(file_inode(file));
   iocb->ki_pos += ret;
 
 exit:
   // Unlock
+  mutex_unlock(&fs_lock);
+  if (buffer)
+    kfree(buffer);
   if (bh)
     brelse(bh);
-  mutex_unlock(&fs_lock);
   return ret;
 }
