@@ -90,7 +90,6 @@ asmlinkage long sys_reference_monitor_set_state(const char *password, int state)
     goto exit;
 
   // Update state
-  // FIXME: adhere to specs for state change
   if ((refmon.state == RM_OFF || refmon.state == RM_REC_OFF) && (state == RM_ON || state == RM_REC_ON))
     ret = probes_enable();
   else if ((refmon.state == RM_ON || refmon.state == RM_REC_ON) && (state == RM_OFF || state == RM_REC_OFF))

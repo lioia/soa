@@ -20,7 +20,6 @@ struct inode_operations fs_inode_ops = {
 };
 struct file_operations fs_dir_operations = {
     .owner = THIS_MODULE,
-    // FIXME: linux version dependent
     .iterate_shared = fs_iterate,
 };
 

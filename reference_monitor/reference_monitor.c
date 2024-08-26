@@ -1,3 +1,5 @@
+#include "linux/rculist.h"
+#include "linux/rcupdate.h"
 #define EXPORT_SYMTAB
 
 #include <asm/apic.h>
@@ -103,15 +105,25 @@ static int reference_monitor_init(void) {
   return ret;
 }
 
-// FIXME: cleanup is not complete
 static void reference_monitor_cleanup(void) {
   // Variable Declaration
   int i = 0;
+  struct reference_monitor_path *node = NULL;
 
   // Reference Monitor Cleanup
   kfree(refmon.password_hash);
   if (refmon.state == RM_ON || refmon.state == RM_REC_ON)
     probes_deinit();
+
+  // Free all paths
+  spin_lock(&refmon.lock);
+  rcu_read_lock();
+  list_for_each_entry_rcu(node, &refmon.list, next) {
+    list_del_rcu(&node->next);
+    kfree(node);
+  }
+  rcu_read_unlock();
+  spin_unlock(&refmon.lock);
 
   pr_info("%s: cleanup\n", MODNAME);
 
