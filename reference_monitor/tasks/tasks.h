@@ -8,7 +8,10 @@ struct reference_monitor_packed_work {
   pid_t tid;                   // Thread ID
   uid_t uid;                   // User ID
   uid_t euid;                  // Effective User ID
-  char *path;                  // Offending Program Path
+  char *program_path;          // Offending Program Path
+  char *primary_file_path;     // Offending File Path (primary)
+  char *secondary_file_path;   // Offending File Path (secondary)
+  char *operation;             // Operation
   struct work_struct the_work; // `data`
 };
 

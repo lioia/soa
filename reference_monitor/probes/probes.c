@@ -22,9 +22,6 @@
 #include "../utils/utils.h"
 #include "probes.h"
 
-// TODO: add in kretprobe_instance data the filename trying to access
-// TODO: add the filename to the work struct and log it
-
 // File edit
 struct kretprobe vfs_open_probe;               // File Edit
 struct kretprobe security_inode_create_probe;  // File Create
@@ -39,39 +36,47 @@ struct kretprobe security_inode_symlink_probe; // Symbolic Link
 // it sets the return value of the syscall to an error value (EACCES) and it
 // schedules the deferred work
 static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  /*  struct reference_monitor_packed_work *work = NULL;*/
-  /**/
-  /*  // Get information about the offending program*/
-  /*  work = kmalloc(sizeof(*work), GFP_ATOMIC);*/
-  /*  if (work == NULL) {*/
-  /*    pr_err("%s: kmalloc for reference_monitor_packed_work failed in probe_post_handler\n", MODNAME);*/
-  /*    goto exit;*/
-  /*  }*/
-  /*  // Lock current thread*/
-  /*  task_lock(current);*/
-  /*  work->tgid = current->tgid;*/
-  /*  work->tid = current->pid;*/
-  /*  work->uid = __kuid_val(current->cred->uid);*/
-  /*  work->euid = __kuid_val(current->cred->euid);*/
-  /**/
-  /*  // Get current pwd*/
-  /*  work->path = get_path_from_dentry(current->mm->exe_file->f_path.dentry); // TODO: error checking*/
-  /*  task_unlock(current);*/
-  /**/
-  /*  // Schedule deferred work*/
-  /*  __INIT_WORK(&(work->the_work), (void *)write_to_log, (unsigned long)(&(work->the_work)));*/
-  /**/
-  /*  schedule_work(&work->the_work);*/
-  /**/
-  /*exit:*/
+  struct reference_monitor_probe_data *data = (struct reference_monitor_probe_data *)p->data;
+  struct reference_monitor_packed_work *work = kmalloc(sizeof(*work), GFP_ATOMIC);
+  if (work == NULL) {
+    pr_err("%s: kmalloc for reference_monitor_packed_work failed in probe_post_handler\n", MODNAME);
+    goto exit;
+  }
+
+  work->operation = data->operation;
+  work->primary_file_path = data->primary_file_path;
+  work->secondary_file_path = data->secondary_file_path;
+  work->tgid = current->tgid;
+  work->tid = current->pid;
+  work->uid = __kuid_val(current->cred->uid);
+  work->euid = __kuid_val(current->cred->euid);
+
+  // Get current pwd
+  work->program_path = get_path_from_dentry(current->mm->exe_file->f_path.dentry);
+  if (work->program_path == NULL) {
+    pr_info("%s: get_path_from_dentry failed in probe_post_handler\n", MODNAME);
+    goto exit_free;
+  }
+
+  // Schedule deferred work
+  __INIT_WORK(&(work->the_work), (void *)write_to_log, (unsigned long)(&(work->the_work)));
+
+  schedule_work(&work->the_work);
+  goto exit;
+
+exit_free:
+  if (work)
+    kfree(work);
+exit:
   // Set return value of the function to EACCES
   regs_set_return_value(regs, -EACCES);
-  regs->ax = (unsigned long)-EACCES;
   return 0;
 }
 
 // int vfs_open(const struct path *, struct file *);
 static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
+  struct reference_monitor_probe_data *data = (struct reference_monitor_probe_data *)p->data;
+
   struct path *path = (struct path *)regs->di;
   struct file *file = (struct file *)regs->si;
 
@@ -81,73 +86,131 @@ static int vfs_open_probe_entry_handler(struct kretprobe_instance *p, struct pt_
     return 1;
 
   // File opened in write mode
-  return !is_file_or_parent_protected(path->dentry);
+  if (is_file_or_parent_protected(path->dentry)) {
+    if (fill_probe_data(data, "open", path->dentry, NULL) != 0)
+      pr_err("%s: fill_probe_data failed in vfs_open_entry_handler\n", MODNAME);
+
+    return 0;
+  }
+
+  return 1;
 }
 
 // int security_inode_create(struct inode *dir, struct dentry *dentry, umode_t mode);
 static int security_inode_create_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
+  struct reference_monitor_probe_data *data = (struct reference_monitor_probe_data *)p->data;
   struct inode *dir = (struct inode *)regs->di;
+  struct dentry *dentry = (struct dentry *)regs->si;
   struct reference_monitor_path *node = search_for_path_in_list(dir->i_ino);
-  return node == NULL;
+  if (node != NULL) {
+    if (fill_probe_data(data, "create", dentry, NULL) != 0)
+      pr_err("%s: fill_probe_data failed in security_inode_create_probe_entry_handler\n", MODNAME);
+
+    return 0;
+  }
+
+  return 1;
 }
 
-// int security_path_symlink(const struct path *dir, struct dentry *dentry, const char *old_name)
+// int security_path_unlink(const struct path *dir, struct dentry *dentry)
 static int security_path_unlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
-  struct path *parent_path = (struct path *)regs->di;
-  struct dentry *new_dentry = (struct dentry *)regs->si;
+  struct reference_monitor_probe_data *data = (struct reference_monitor_probe_data *)p->data;
+  struct path *dir = (struct path *)regs->di;
+  struct dentry *dentry = (struct dentry *)regs->si;
 
-  bool parent_protected = is_file_or_parent_protected(parent_path->dentry);
-  bool new_protected = is_file_or_parent_protected(new_dentry);
+  bool dir_protected = is_file_or_parent_protected(dir->dentry);
+  bool file_protected = is_file_or_parent_protected(dentry);
 
-  return !(parent_protected || new_protected);
+  if (dir_protected || file_protected) {
+    if (fill_probe_data(data, "unlink", dentry, NULL) != 0)
+      pr_err("%s: fill_probe_data failed in security_path_unlink_probe_entry_handler\n", MODNAME);
+
+    return 0;
+  }
+
+  return 1;
 }
 
 // int security_inode_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_dentry)
 static int security_inode_link_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
+  struct reference_monitor_probe_data *data = (struct reference_monitor_probe_data *)p->data;
   struct dentry *old_dentry = (struct dentry *)regs->di;
   struct dentry *new_dentry = (struct dentry *)regs->dx;
   bool old_protected = is_file_or_parent_protected(old_dentry);
   bool new_protected = is_file_or_parent_protected(new_dentry);
 
-  return !(old_protected || new_protected);
+  if (old_protected || new_protected) {
+    if (fill_probe_data(data, "link", old_dentry, new_dentry) != 0)
+      pr_err("%s: fill_probe_data failed in security_inode_link_probe_entry_handler\n", MODNAME);
+
+    return 0;
+  }
+
+  return 1;
 }
 
 // int security_path_mkdir(const struct path *dir, struct dentry *dentry, umode_t mode)
 static int security_path_mkdir_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
+  struct reference_monitor_probe_data *data = (struct reference_monitor_probe_data *)p->data;
   struct path *parent_path = (struct path *)regs->di;
   struct dentry *new_dentry = (struct dentry *)regs->si;
 
   bool parent_protected = is_file_or_parent_protected(parent_path->dentry);
   bool new_protected = is_file_or_parent_protected(new_dentry);
 
-  return !(parent_protected || new_protected);
+  if (parent_protected || new_protected) {
+    if (fill_probe_data(data, "mkdir", new_dentry, NULL) != 0)
+      pr_err("%s: fill_probe_data failed in security_path_mkdir_probe_entry_handler\n", MODNAME);
+
+    pr_info("mkdir probe");
+    return 0;
+  }
+
+  return 1;
 }
 
 // int security_path_rmdir(const struct path *dir, struct dentry *dentry)
 static int security_path_rmdir_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
+  struct reference_monitor_probe_data *data = (struct reference_monitor_probe_data *)p->data;
   struct path *parent_path = (struct path *)regs->di;
   struct dentry *new_dentry = (struct dentry *)regs->si;
 
   bool parent_protected = is_file_or_parent_protected(parent_path->dentry);
   bool new_protected = is_file_or_parent_protected(new_dentry);
 
-  return !(parent_protected || new_protected);
+  if (parent_protected || new_protected) {
+    if (fill_probe_data(data, "rmdir", new_dentry, NULL) != 0)
+      pr_err("%s: fill_probe_data failed in security_path_rmdir_probe_entry_handler\n", MODNAME);
+
+    return 0;
+  }
+
+  return 1;
 }
 
 // int security_path_rename(const struct path *old_dir, struct dentry *old_dentry,
 //      const struct path *new_dir, struct dentry *new_dentry,
 //      unsigned int flags)
 static int security_path_rename_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
+  struct reference_monitor_probe_data *data = (struct reference_monitor_probe_data *)p->data;
   struct dentry *old_dentry = (struct dentry *)regs->si;
   struct dentry *new_dentry = (struct dentry *)regs->cx;
   bool old_protected = is_file_or_parent_protected(old_dentry);
   bool new_protected = is_file_or_parent_protected(new_dentry);
 
-  return !(old_protected || new_protected);
+  if (old_protected || new_protected) {
+    if (fill_probe_data(data, "rename", old_dentry, new_dentry) != 0)
+      pr_err("%s: fill_probe_data failed in security_path_rename_probe_entry_handler\n", MODNAME);
+
+    return 0;
+  }
+
+  return 1;
 }
 
 // int security_inode_symlink(struct inode *dir, struct dentry *dentry, const char *old_name)
 static int security_inode_symlink_probe_entry_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
+  struct reference_monitor_probe_data *data = (struct reference_monitor_probe_data *)p->data;
   struct dentry *new_dentry = (struct dentry *)regs->si;
   char *old_name = (char *)regs->dx;
   struct path old_path;
@@ -156,14 +219,23 @@ static int security_inode_symlink_probe_entry_handler(struct kretprobe_instance 
   if (kern_path(old_name, LOOKUP_FOLLOW, &old_path) == -ENOENT) {
     // Handling vi/emacs temp files
     if (kern_path(strcat(old_name, "~"), LOOKUP_FOLLOW, &old_path) != 0)
-      return 0; // Path not found; nothing to do
+      return 1; // Path not found; nothing to do
   }
 
   old_protected = is_file_or_parent_protected(old_path.dentry);
   new_protected = is_file_or_parent_protected(new_dentry);
 
+  if (old_protected || new_protected) {
+    if (fill_probe_data(data, "symlink", new_dentry, NULL) != 0)
+      pr_err("%s: fill_probe_data in security_inode_symlink_probe_entry_handler\n", MODNAME);
+
+    path_put(&old_path);
+    pr_info("symlink probe");
+    return 0;
+  }
+
   path_put(&old_path);
-  return !(old_protected || new_protected);
+  return 1;
 }
 
 int probes_init(void) {
@@ -228,4 +300,20 @@ int probes_disable(void) {
   DISABLE_PROBE(security_path_rename);
   DISABLE_PROBE(security_inode_symlink);
   return ret;
+}
+
+int fill_probe_data(struct reference_monitor_probe_data *data, char *operation, struct dentry *primary,
+                    struct dentry *secondary) {
+  data->operation = operation;
+  data->primary_file_path = get_path_from_dentry(primary);
+  if (data->primary_file_path == NULL)
+    return -1;
+  if (secondary == NULL)
+    return 0;
+
+  data->secondary_file_path = get_path_from_dentry(secondary);
+  if (data->secondary_file_path == NULL)
+    return -1;
+
+  return 0;
 }

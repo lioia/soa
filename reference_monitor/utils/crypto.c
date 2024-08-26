@@ -76,7 +76,7 @@ char *crypt_data(const unsigned char *data, bool is_file) {
     goto exit;
   }
 
-  hash = kzalloc(sizeof(*hash) * 2 * SHA_LENGTH + 1, GFP_ATOMIC);
+  hash = kmalloc(sizeof(*hash) * 2 * SHA_LENGTH + 1, GFP_ATOMIC);
   if (hash == NULL) {
     pr_err("%s: kmalloc failed for hash in crypt_data\n", MODNAME);
     goto exit;
@@ -99,12 +99,17 @@ exit:
 
 bool check_hash(const unsigned char *data, const unsigned char *hashed) {
   // Variable Declaration
-  char *out;
+  char *out = NULL;
+  bool ret;
 
   out = crypt_data(data, false);
   if (out == NULL) {
     pr_err("%s: crypt_data failed\n", MODNAME);
     return -1;
   }
-  return strcmp(out, hashed) == 0;
+  ret = strcmp(out, hashed) == 0;
+
+  kfree(out);
+
+  return ret;
 }

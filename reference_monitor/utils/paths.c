@@ -5,25 +5,33 @@
 extern struct reference_monitor refmon;
 
 char *get_path_from_dentry(struct dentry *dentry) {
-  char *path = NULL, *buffer = NULL;
+  char *path = NULL, *buffer = NULL, *ret = NULL;
+  int path_len = 0;
 
   buffer = kmalloc(sizeof(*buffer) * PATH_MAX, GFP_ATOMIC);
   if (buffer == NULL) {
-    pr_info("%s: kmalloc failed in get_complete_path_from_dentry\n", MODNAME);
-    return NULL;
+    pr_info("%s: kmalloc failed in get_path_from_dentry\n", MODNAME);
+    goto exit;
   }
 
   path = dentry_path_raw(dentry, buffer, PATH_MAX);
   if (IS_ERR(path)) {
-    pr_info("%s: dentry_path_raw failed in get_complete_path_from_dentry\n", MODNAME);
-    path = NULL;
+    pr_info("%s: dentry_path_raw failed in get_path_from_dentry\n", MODNAME);
     goto exit;
   }
+  path_len = strlen(path) + 1;
+
+  ret = kmalloc(sizeof(*ret) * path_len, GFP_ATOMIC);
+  if (ret == NULL) {
+    pr_info("%s: kmalloc failed in get_path_from_dentry\n", MODNAME);
+    goto exit;
+  }
+  memcpy(ret, path, path_len * sizeof(*ret));
 
 exit:
   if (buffer)
-    kfree(buffer);
-  return path;
+    kfree(buffer); // path is a pointer inside buffer; so it's now invalid
+  return ret;
 }
 
 // Search for path in the rcu list
