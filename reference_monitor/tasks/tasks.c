@@ -1,10 +1,8 @@
 #include "tasks.h"
 
-#include <cstring>
 #include <linux/fs.h>
 #include <linux/printk.h>
 #include <linux/slab.h>
-#include <string.h>
 
 #include "../reference_monitor.h"
 #include "../utils/utils.h"
