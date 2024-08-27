@@ -6,12 +6,14 @@
 #include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
+#include <linux/version.h>
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 15, 0)
 #include <linux/mnt_idmapping.h>
+#endif
 #include <linux/printk.h>
 #include <linux/time64.h>
 #include <linux/timekeeping.h>
 #include <linux/types.h>
-#include <linux/version.h>
 
 struct super_operations fs_super_ops = {};
 struct dentry_operations fs_dentry_ops = {};

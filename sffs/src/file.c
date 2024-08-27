@@ -5,15 +5,19 @@
 #include <linux/dcache.h>
 #include <linux/err.h>
 #include <linux/fs.h>
+#include <linux/version.h>
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 9, 0)
 #include <linux/minmax.h>
+#endif
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 15, 0)
 #include <linux/mnt_idmapping.h>
+#endif
 #include <linux/mutex.h>
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
 #include <linux/uio.h>
-#include <linux/version.h>
 
 extern struct inode_operations fs_inode_ops;
 struct file_operations fs_file_operations = {
