@@ -77,7 +77,7 @@ int fs_fill_sb(struct super_block *sb, void *data, int silent) {
   }
 
 // Set root user as owner of the FS root
-#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 1, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 2, 0)
   inode_init_owner(&nop_mnt_idmap, root_inode, NULL, S_IFDIR);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
   inode_init_owner(sb->s_user_ns, root_inode, NULL, S_IFDIR);

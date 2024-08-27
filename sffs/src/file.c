@@ -48,7 +48,7 @@ struct dentry *fs_lookup(struct inode *parent_inode, struct dentry *child_dentry
     return child_dentry;
 
     // inode was not cached
-#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 1, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 2, 0)
   inode_init_owner(&nop_mnt_idmap, the_inode, NULL, S_IFDIR);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
   inode_init_owner(sb->s_user_ns, the_inode, NULL, S_IFDIR);
