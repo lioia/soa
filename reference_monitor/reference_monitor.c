@@ -113,7 +113,8 @@ static void reference_monitor_cleanup(void) {
   // Reference Monitor Cleanup
   kfree(refmon.password_hash);
   if (refmon.state == RM_ON || refmon.state == RM_REC_ON)
-    probes_deinit();
+    probes_disable();
+  probes_deinit();
 
   // Free all paths
   spin_lock(&refmon.lock);
