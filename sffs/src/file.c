@@ -156,7 +156,7 @@ ssize_t fs_write_iter(struct kiocb *iocb, struct iov_iter *from) {
   if (bytes_to_write > DEFAULT_BLOCK_SIZE - offset_in_block)
     remaining_bytes = DEFAULT_BLOCK_SIZE - offset_in_block;
 
-  buffer = kmalloc(bytes_to_write, GFP_ATOMIC);
+  buffer = kmalloc(bytes_to_write, GFP_KERNEL);
   if (buffer == NULL) {
     pr_err("%s: kmalloc for buffer failed in fs_write_iter\n", MODNAME);
     ret = -ENOMEM;

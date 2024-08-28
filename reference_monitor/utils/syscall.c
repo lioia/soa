@@ -28,7 +28,7 @@ asmlinkage long sys_reference_monitor_change_password(const char *password, cons
 
   pr_info("%s: change_password\n", MODNAME);
   // Get free page
-  buffer = (char *)__get_free_page(GFP_ATOMIC);
+  buffer = (char *)__get_free_page(GFP_KERNEL);
   if (buffer == NULL) {
     pr_err("%s: get_free_page failed in syscall change_password\n", MODNAME);
     ret = -ENOMEM;
@@ -78,7 +78,7 @@ asmlinkage long sys_reference_monitor_set_state(const char *password, int state)
   int ret = 0;
 
   // Get free page
-  buffer = (char *)__get_free_page(GFP_ATOMIC);
+  buffer = (char *)__get_free_page(GFP_KERNEL);
   if (buffer == NULL) {
     pr_err("%s: get_free_page failed in syscall change_password\n", MODNAME);
     ret = -ENOMEM;
@@ -123,7 +123,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
 
   pr_info(KERN_INFO "%s: add_path\n", MODNAME);
   // Get free page
-  buffer = (char *)__get_free_page(GFP_ATOMIC);
+  buffer = (char *)__get_free_page(GFP_KERNEL);
   if (buffer == NULL) {
     pr_err("%s: get_free_page failed for buffer in syscall add_path\n", MODNAME);
     return -ENOMEM;
@@ -164,7 +164,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
     goto exit;
   }
   // Node not found; creating new one
-  node = kmalloc(sizeof(*node), GFP_ATOMIC);
+  node = kmalloc(sizeof(*node), GFP_KERNEL);
   if (node == NULL) {
     pr_err("%s: kmalloc for node failed in syscall add_path\n", MODNAME);
     ret = -ENOMEM;
@@ -201,7 +201,7 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
 
   pr_info(KERN_INFO "%s: delete_path\n", MODNAME);
   // Get new buffer
-  buffer = (char *)__get_free_page(GFP_ATOMIC);
+  buffer = (char *)__get_free_page(GFP_KERNEL);
   if (buffer == NULL) {
     pr_err("%s: get_free_page for buffer failed in syscall delete_path\n", MODNAME);
     return -ENOMEM;

@@ -35,7 +35,7 @@ char *crypt_data(const unsigned char *data, bool is_file) {
     pr_err("%s: crypto_alloc_shash failed in crypt_data\n", MODNAME);
     return NULL;
   }
-  desc = kmalloc(sizeof(struct shash_desc) + crypto_shash_descsize(tfm), GFP_ATOMIC);
+  desc = kmalloc(sizeof(struct shash_desc) + crypto_shash_descsize(tfm), GFP_KERNEL);
   if (desc == NULL) {
     pr_err("%s: kmalloc failed for desc in crypt_data\n", MODNAME);
     goto exit;
@@ -76,7 +76,7 @@ char *crypt_data(const unsigned char *data, bool is_file) {
     goto exit;
   }
 
-  hash = kmalloc(sizeof(*hash) * 2 * SHA_LENGTH + 1, GFP_ATOMIC);
+  hash = kmalloc(sizeof(*hash) * 2 * SHA_LENGTH + 1, GFP_KERNEL);
   if (hash == NULL) {
     pr_err("%s: kmalloc failed for hash in crypt_data\n", MODNAME);
     goto exit;
