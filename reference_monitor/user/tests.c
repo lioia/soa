@@ -10,6 +10,7 @@
 
 #include "tests.h"
 #include "user.h"
+#include "utils.h"
 
 #ifndef PASSWORD
 #define PASSWORD "1"
@@ -36,6 +37,10 @@
   } while (0)
 
 int main(void) {
+  // Check if module is loaded
+  if (check_if_module_is_inserted() != 0)
+    exit(EXIT_FAILURE);
+
   RUN_TEST(create);
   RUN_TEST(open);
   RUN_TEST(unlink);

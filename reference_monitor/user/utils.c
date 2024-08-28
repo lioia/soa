@@ -24,31 +24,13 @@ int check_if_module_is_inserted() {
 }
 
 char *resolve_path(char *path) {
-  int len = PATH_MAX;
-  char *resolved_path = malloc(sizeof(*resolved_path) * len);
-  if (resolved_path == NULL) {
-    perror("malloc failed in resolve_path");
+  if (path[0] == '~') {
+    fprintf(stderr, "Cannot resolve '~'\n");
     return NULL;
   }
 
-  if (path[0] == '~') {
-    char *home_dir = getenv("HOME");
-    if (home_dir == NULL) {
-      perror("getenv for HOME failed in resolve_path");
-      return NULL;
-    }
-
-    len = snprintf(resolved_path, len, "%s%s", home_dir, path + 1);
-    resolved_path = realloc(resolved_path, sizeof(*resolved_path) * len);
-    if (resolved_path == NULL) {
-      perror("realloc failed in resolve_path");
-      return NULL;
-    }
-  } else {
-    strncpy(resolved_path, path, len);
-  }
-
-  if (realpath(resolved_path, resolved_path) == NULL) {
+  char *resolved_path = realpath(path, NULL);
+  if (resolved_path == NULL) {
     perror("realpath failed in resolve_path");
     return NULL;
   }

@@ -78,7 +78,7 @@ int add_path(bool hide) {
   if (resolved_path == NULL)
     goto exit;
 
-  ret = syscall(ADD_PATH, password, path);
+  ret = syscall(ADD_PATH, password, resolved_path);
 
 exit:
   if (password)
