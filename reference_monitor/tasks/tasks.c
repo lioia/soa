@@ -19,9 +19,6 @@ void write_to_log(unsigned long data) {
   primary_file_path = work->primary_file_path == NULL ? "" : work->primary_file_path;
   secondary_file_path = work->secondary_file_path == NULL ? "" : work->secondary_file_path;
 
-  if (work->secondary_file_path == NULL)
-    pr_info("secondary_file_path is %s\n", secondary_file_path);
-
   // Calculate hash of offending program contents
   hash = crypt_data(work->program_path, true);
   if (hash == NULL) {
