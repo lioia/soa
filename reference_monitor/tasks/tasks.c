@@ -15,7 +15,6 @@ void write_to_log(unsigned long data) {
 
   // Get the work
   work = container_of((void *)data, struct reference_monitor_packed_work, the_work);
-  goto exit;
 
   primary_file_path = work->primary_file_path == NULL ? "" : work->primary_file_path;
   secondary_file_path = work->secondary_file_path == NULL ? "" : work->secondary_file_path;
@@ -46,6 +45,7 @@ void write_to_log(unsigned long data) {
             work->euid, primary_file_path, secondary_file_path, work->program_path, hash);
     goto exit;
   }
+
   // len now contains the actual length of the formatted string (line is still overfitted)
   len = scnprintf(line, len, "%s,%d,%d,%d,%d,%s,%s,%s,%s\n", work->operation, work->tgid, work->tid, work->uid,
                   work->euid, primary_file_path, secondary_file_path, work->program_path, hash);

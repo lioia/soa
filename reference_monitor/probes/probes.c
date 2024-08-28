@@ -60,7 +60,6 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
     pr_info("%s: get_pathname_from_path failed in probe_post_handler (%lu)\n", MODNAME, work->program_path_len);
     goto exit_free;
   }
-  pr_info("program: %zu %s\n", work->program_path_len, work->program_path);
 
   // Schedule deferred work
   __INIT_WORK(&(work->the_work), (void *)write_to_log, (unsigned long)(&(work->the_work)));
