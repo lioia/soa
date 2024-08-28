@@ -51,10 +51,10 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
   work->uid = __kuid_val(current->cred->uid);
   work->euid = __kuid_val(current->cred->euid);
 
-  // Get current pwd
-  work->program_path = get_path_from_dentry(current->mm->exe_file->f_path.dentry);
+  // Get current process
+  work->program_path = get_pathname_from_path(&current->mm->exe_file->f_path);
   if (work->program_path == NULL) {
-    pr_info("%s: get_path_from_dentry failed in probe_post_handler\n", MODNAME);
+    pr_info("%s: get_pathname_from_path failed in probe_post_handler\n", MODNAME);
     goto exit_free;
   }
 
@@ -162,7 +162,6 @@ static int security_path_mkdir_probe_entry_handler(struct kretprobe_instance *p,
     if (fill_probe_data(data, "mkdir", new_dentry, NULL) != 0)
       pr_err("%s: fill_probe_data failed in security_path_mkdir_probe_entry_handler\n", MODNAME);
 
-    pr_info("mkdir probe");
     return 0;
   }
 
@@ -230,7 +229,6 @@ static int security_inode_symlink_probe_entry_handler(struct kretprobe_instance 
       pr_err("%s: fill_probe_data in security_inode_symlink_probe_entry_handler\n", MODNAME);
 
     path_put(&old_path);
-    pr_info("symlink probe");
     return 0;
   }
 
@@ -305,13 +303,13 @@ int probes_disable(void) {
 int fill_probe_data(struct reference_monitor_probe_data *data, char *operation, struct dentry *primary,
                     struct dentry *secondary) {
   data->operation = operation;
-  data->primary_file_path = get_path_from_dentry(primary);
+  data->primary_file_path = get_pathname_from_dentry(primary);
   if (data->primary_file_path == NULL)
     return -1;
   if (secondary == NULL)
     return 0;
 
-  data->secondary_file_path = get_path_from_dentry(secondary);
+  data->secondary_file_path = get_pathname_from_dentry(secondary);
   if (data->secondary_file_path == NULL)
     return -1;
 

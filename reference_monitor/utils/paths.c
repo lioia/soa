@@ -1,36 +1,46 @@
-#include "linux/dcache.h"
-#include "linux/printk.h"
+#include <linux/dcache.h>
+#include <linux/path.h>
+#include <linux/printk.h>
+
 #include "utils.h"
 
 extern struct reference_monitor refmon;
 
-char *get_path_from_dentry(struct dentry *dentry) {
-  char *path = NULL, *buffer = NULL, *ret = NULL;
-  int path_len = 0;
+#define GET_PATHNAME(func, ptr)                                                                                        \
+  do {                                                                                                                 \
+    char *pathname = NULL, *buffer = NULL;                                                                             \
+    int path_len = 0;                                                                                                  \
+    buffer = kzalloc(sizeof(*buffer) * PATH_MAX, GFP_ATOMIC);                                                          \
+    if (buffer == NULL) {                                                                                              \
+      pr_err("%s: kmalloc failed in GET_PATHNAME using %s\n", MODNAME, #func);                                         \
+      goto exit;                                                                                                       \
+    }                                                                                                                  \
+    pathname = func(ptr, buffer, PATH_MAX);                                                                            \
+    if (IS_ERR(pathname)) {                                                                                            \
+      pr_err("%s: dentry_path_raw failed in GET_PATHNAME using %s\n", MODNAME, #func);                                 \
+      goto exit;                                                                                                       \
+    }                                                                                                                  \
+    path_len = strlen(pathname) + 1;                                                                                   \
+    ret = kzalloc(sizeof(*ret) * path_len, GFP_ATOMIC);                                                                \
+    if (ret == NULL) {                                                                                                 \
+      pr_err("%s: kmalloc failed in GET_PATHNAME using %s\n", MODNAME, #func);                                         \
+      goto exit;                                                                                                       \
+    }                                                                                                                  \
+    strscpy(ret, pathname, path_len);                                                                                  \
+  exit:                                                                                                                \
+    if (buffer)                                                                                                        \
+      kfree(buffer);                                                                                                   \
+  } while (0)
 
-  buffer = kmalloc(sizeof(*buffer) * PATH_MAX, GFP_ATOMIC);
-  if (buffer == NULL) {
-    pr_info("%s: kmalloc failed in get_path_from_dentry\n", MODNAME);
-    goto exit;
-  }
+char *get_pathname_from_dentry(struct dentry *dentry) {
+  char *ret = NULL;
+  GET_PATHNAME(dentry_path_raw, dentry);
+  return ret;
+}
 
-  path = dentry_path_raw(dentry, buffer, PATH_MAX);
-  if (IS_ERR(path)) {
-    pr_info("%s: dentry_path_raw failed in get_path_from_dentry\n", MODNAME);
-    goto exit;
-  }
-  path_len = strlen(path) + 1;
-
-  ret = kmalloc(sizeof(*ret) * path_len, GFP_ATOMIC);
-  if (ret == NULL) {
-    pr_info("%s: kmalloc failed in get_path_from_dentry\n", MODNAME);
-    goto exit;
-  }
-  memcpy(ret, path, path_len * sizeof(*ret));
-
-exit:
-  if (buffer)
-    kfree(buffer); // path is a pointer inside buffer; so it's now invalid
+char *get_pathname_from_path(struct path *path) {
+  char *ret = NULL;
+  GET_PATHNAME(d_path, path);
   return ret;
 }
 
