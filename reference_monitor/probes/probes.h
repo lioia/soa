@@ -5,8 +5,11 @@
 
 struct reference_monitor_probe_data {
   char *primary_file_path;
+  size_t primary_file_path_len;
   char *secondary_file_path;
+  size_t secondary_file_path_len;
   char *operation;
+  size_t operation_len;
 };
 
 int probes_init(void);

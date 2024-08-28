@@ -37,7 +37,7 @@ struct kretprobe security_inode_symlink_probe; // Symbolic Link
 // schedules the deferred work
 static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs) {
   struct reference_monitor_probe_data *data = (struct reference_monitor_probe_data *)p->data;
-  struct reference_monitor_packed_work *work = kmalloc(sizeof(*work), GFP_ATOMIC);
+  struct reference_monitor_packed_work *work = kmalloc(sizeof(*work), GFP_KERNEL);
   if (work == NULL) {
     pr_err("%s: kmalloc for reference_monitor_packed_work failed in probe_post_handler\n", MODNAME);
     goto exit;
@@ -46,17 +46,21 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
   work->operation = data->operation;
   work->primary_file_path = data->primary_file_path;
   work->secondary_file_path = data->secondary_file_path;
+  work->operation_len = data->operation_len;
+  work->primary_file_path_len = data->primary_file_path_len;
+  work->secondary_file_path_len = data->secondary_file_path_len;
   work->tgid = current->tgid;
   work->tid = current->pid;
   work->uid = __kuid_val(current->cred->uid);
   work->euid = __kuid_val(current->cred->euid);
 
   // Get current process
-  work->program_path = get_pathname_from_path(&current->mm->exe_file->f_path);
+  work->program_path = get_pathname_from_path(&current->mm->exe_file->f_path, &work->program_path_len);
   if (work->program_path == NULL) {
-    pr_info("%s: get_pathname_from_path failed in probe_post_handler\n", MODNAME);
+    pr_info("%s: get_pathname_from_path failed in probe_post_handler (%lu)\n", MODNAME, work->program_path_len);
     goto exit_free;
   }
+  pr_info("program: %zu %s\n", work->program_path_len, work->program_path);
 
   // Schedule deferred work
   __INIT_WORK(&(work->the_work), (void *)write_to_log, (unsigned long)(&(work->the_work)));
@@ -303,13 +307,19 @@ int probes_disable(void) {
 int fill_probe_data(struct reference_monitor_probe_data *data, char *operation, struct dentry *primary,
                     struct dentry *secondary) {
   data->operation = operation;
-  data->primary_file_path = get_pathname_from_dentry(primary);
+  data->operation_len = 7; // Max operation length (symlink)
+
+  data->primary_file_path = get_pathname_from_dentry(primary, &data->primary_file_path_len);
   if (data->primary_file_path == NULL)
     return -1;
-  if (secondary == NULL)
-    return 0;
 
-  data->secondary_file_path = get_pathname_from_dentry(secondary);
+  if (secondary == NULL) {
+    data->secondary_file_path = NULL;
+    data->secondary_file_path_len = 0;
+    return 0;
+  }
+
+  data->secondary_file_path = get_pathname_from_dentry(secondary, &data->secondary_file_path_len);
   if (data->secondary_file_path == NULL)
     return -1;
 

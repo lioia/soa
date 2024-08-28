@@ -6,44 +6,6 @@
 
 extern struct reference_monitor refmon;
 
-#define GET_PATHNAME(func, ptr)                                                                                        \
-  do {                                                                                                                 \
-    char *pathname = NULL, *buffer = NULL;                                                                             \
-    int path_len = 0;                                                                                                  \
-    buffer = kzalloc(sizeof(*buffer) * PATH_MAX, GFP_ATOMIC);                                                          \
-    if (buffer == NULL) {                                                                                              \
-      pr_err("%s: kmalloc failed in GET_PATHNAME using %s\n", MODNAME, #func);                                         \
-      goto exit;                                                                                                       \
-    }                                                                                                                  \
-    pathname = func(ptr, buffer, PATH_MAX);                                                                            \
-    if (IS_ERR(pathname)) {                                                                                            \
-      pr_err("%s: dentry_path_raw failed in GET_PATHNAME using %s\n", MODNAME, #func);                                 \
-      goto exit;                                                                                                       \
-    }                                                                                                                  \
-    path_len = strlen(pathname) + 1;                                                                                   \
-    ret = kzalloc(sizeof(*ret) * path_len, GFP_ATOMIC);                                                                \
-    if (ret == NULL) {                                                                                                 \
-      pr_err("%s: kmalloc failed in GET_PATHNAME using %s\n", MODNAME, #func);                                         \
-      goto exit;                                                                                                       \
-    }                                                                                                                  \
-    strscpy(ret, pathname, path_len);                                                                                  \
-  exit:                                                                                                                \
-    if (buffer)                                                                                                        \
-      kfree(buffer);                                                                                                   \
-  } while (0)
-
-char *get_pathname_from_dentry(struct dentry *dentry) {
-  char *ret = NULL;
-  GET_PATHNAME(dentry_path_raw, dentry);
-  return ret;
-}
-
-char *get_pathname_from_path(struct path *path) {
-  char *ret = NULL;
-  GET_PATHNAME(d_path, path);
-  return ret;
-}
-
 // Search for path in the rcu list
 struct reference_monitor_path *search_for_path_in_list(unsigned long i_ino) {
   struct reference_monitor_path *node = NULL, *ret = NULL;
@@ -102,4 +64,46 @@ struct dentry *get_dentry_from_pathname(char *path_name) {
 
   path_put(&path);
   return dentry;
+}
+
+#define GET_PATHNAME(func, ptr, path_ptr, len_ptr)                                                                     \
+  do {                                                                                                                 \
+    char *pathname = NULL, *buffer = NULL;                                                                             \
+    buffer = kzalloc(sizeof(*buffer) * PATH_MAX, GFP_KERNEL);                                                          \
+    if (buffer == NULL) {                                                                                              \
+      pr_err("%s: kmalloc failed in GET_PATHNAME using %s\n", MODNAME, #func);                                         \
+      goto exit;                                                                                                       \
+    }                                                                                                                  \
+    pathname = func(ptr, buffer, PATH_MAX);                                                                            \
+    if (IS_ERR(pathname)) {                                                                                            \
+      pr_err("%s: dentry_path_raw failed in GET_PATHNAME using %s\n", MODNAME, #func);                                 \
+      goto exit;                                                                                                       \
+    }                                                                                                                  \
+    *len_ptr = strlen(pathname) + 1;                                                                                   \
+    path_ptr = kzalloc(sizeof(*path_ptr) * *len_ptr, GFP_KERNEL);                                                      \
+    if (path_ptr == NULL) {                                                                                            \
+      pr_err("%s: kmalloc failed in GET_PATHNAME using %s\n", MODNAME, #func);                                         \
+      *len_ptr = 0;                                                                                                    \
+      goto exit;                                                                                                       \
+    }                                                                                                                  \
+    strscpy(path_ptr, pathname, *len_ptr);                                                                             \
+  exit:                                                                                                                \
+    if (buffer)                                                                                                        \
+      kfree(buffer);                                                                                                   \
+    if (*len_ptr == 0 && path_ptr) {                                                                                   \
+      kfree(path_ptr);                                                                                                 \
+      path_ptr = NULL;                                                                                                 \
+    }                                                                                                                  \
+  } while (0)
+
+char *get_pathname_from_dentry(struct dentry *dentry, size_t *len) {
+  char *result = NULL;
+  GET_PATHNAME(dentry_path_raw, dentry, result, len);
+  return result;
+}
+
+char *get_pathname_from_path(struct path *path, size_t *len) {
+  char *result = NULL;
+  GET_PATHNAME(d_path, path, result, len);
+  return result;
 }
