@@ -1,16 +1,3 @@
-#include <linux/err.h>
-#include <linux/errno.h>
-#include <linux/gfp.h>
-#include <linux/limits.h>
-#include <linux/printk.h>
-#include <linux/rculist.h>
-#include <linux/slab.h>
-#include <linux/spinlock.h>
-#include <linux/syscalls.h>
-#include <linux/uaccess.h>
-#include <linux/uidgid.h>
-#include <linux/version.h>
-
 #include "../probes/probes.h"
 #include "../reference_monitor.h"
 #include "linux/path.h"
@@ -139,6 +126,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
     goto exit;
   }
 
+  // Clear the page for reusage
   clear_page(buffer);
 
   // Copy provided path from user to buffer
@@ -148,7 +136,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
     goto exit;
   }
 
-  // Setting the path to the buffer
+  // Getting the dentry from the pathname; used to get the inode number
   dentry = get_dentry_from_pathname(buffer);
   if (dentry == NULL) {
     pr_err("%s: get_dentry_from_pathname failed in syscall add_path\n", MODNAME);
@@ -171,6 +159,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
     goto exit;
   }
 
+  // Setting the inode number
   node->i_ino = dentry->d_inode->i_ino;
 
   // Adding the node in an atomic way to the rcu list
@@ -178,7 +167,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   list_add_rcu(&node->next, &refmon.list);
   spin_unlock(&refmon.lock);
 
-exit: // On correct insertion
+exit:
   if (buffer)
     free_page((unsigned long)buffer);
   return ret;
@@ -216,6 +205,7 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
     return -EPERM;
   }
 
+  // Clear buffer for reusage
   clear_page(buffer);
 
   // Copy provided path into buffer
@@ -224,7 +214,8 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
     ret = -EINVAL;
     goto exit;
   }
-  // Search for node in the rcu list
+
+  // Getting the dentry from the pathname
   dentry = get_dentry_from_pathname(buffer);
   if (ret != 0) {
     pr_err("%s: get_dentry_from_path failed in syscall add_path\n", MODNAME);
@@ -232,6 +223,7 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
     goto exit;
   }
 
+  // Search for the inode number in the RCU list
   node = search_for_path_in_list(dentry->d_inode->i_ino);
 
   // If found, remove from the list

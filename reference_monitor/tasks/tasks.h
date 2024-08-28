@@ -15,10 +15,14 @@ struct reference_monitor_packed_work {
   char *secondary_file_path;      // Offending File Path (secondary)
   size_t secondary_file_path_len; // Secondary File Path Length
   char *operation;                // Operation
-  size_t operation_len;           // Operation Length
   struct work_struct the_work;    // `data`
 };
 
+/**
+ * @brief Deferred work: computes SHA256 of program and writes to log (file or dmesg)
+ *
+ * @param data pointer to the_work of reference_monitor_packed_work
+ */
 void write_to_log(unsigned long data);
 
 #endif // !TASKS_H

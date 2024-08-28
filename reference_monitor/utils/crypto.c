@@ -1,20 +1,3 @@
-#include <crypto/hash.h>
-#include <linux/cred.h>
-#include <linux/dcache.h>
-#include <linux/err.h>
-#include <linux/errno.h>
-#include <linux/fs.h>
-#include <linux/gfp.h>
-#include <linux/limits.h>
-#include <linux/namei.h>
-#include <linux/path.h>
-#include <linux/printk.h>
-#include <linux/rcupdate.h>
-#include <linux/slab.h>
-#include <linux/string.h>
-#include <linux/uaccess.h>
-#include <linux/uidgid.h>
-
 #include "utils.h"
 
 // Adapted from https://github.com/torvalds/linux/blob/master/Documentation/crypto/api-samples.rst

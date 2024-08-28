@@ -1,7 +1,3 @@
-#include <linux/dcache.h>
-#include <linux/path.h>
-#include <linux/printk.h>
-
 #include "utils.h"
 
 extern struct reference_monitor refmon;
@@ -69,27 +65,39 @@ struct dentry *get_dentry_from_pathname(char *path_name) {
 #define GET_PATHNAME(func, ptr, path_ptr, len_ptr)                                                                     \
   do {                                                                                                                 \
     char *pathname = NULL, *buffer = NULL;                                                                             \
+    /* Allocate a buffer of PATH_MAX, to use in func */                                                                \
     buffer = kzalloc(sizeof(*buffer) * PATH_MAX, GFP_KERNEL);                                                          \
     if (buffer == NULL) {                                                                                              \
       pr_err("%s: kmalloc failed in GET_PATHNAME using %s\n", MODNAME, #func);                                         \
       goto exit;                                                                                                       \
     }                                                                                                                  \
+                                                                                                                       \
+    /* Call either d_path or dentry_path_raw */                                                                        \
     pathname = func(ptr, buffer, PATH_MAX);                                                                            \
     if (IS_ERR(pathname)) {                                                                                            \
       pr_err("%s: dentry_path_raw failed in GET_PATHNAME using %s\n", MODNAME, #func);                                 \
       goto exit;                                                                                                       \
     }                                                                                                                  \
+                                                                                                                       \
+    /* Store length of the path */                                                                                     \
     *len_ptr = strlen(pathname) + 1;                                                                                   \
+                                                                                                                       \
+    /* Allocate a new path, to return to the caller */                                                                 \
     path_ptr = kzalloc(sizeof(*path_ptr) * *len_ptr, GFP_KERNEL);                                                      \
     if (path_ptr == NULL) {                                                                                            \
       pr_err("%s: kmalloc failed in GET_PATHNAME using %s\n", MODNAME, #func);                                         \
       *len_ptr = 0;                                                                                                    \
       goto exit;                                                                                                       \
     }                                                                                                                  \
+                                                                                                                       \
+    /* Copy the result from func into the new path */                                                                  \
     strscpy(path_ptr, pathname, *len_ptr);                                                                             \
+                                                                                                                       \
   exit:                                                                                                                \
+    /* Free buffer (pathname is a pointer inside buffer, so it does not need to be freed) */                           \
     if (buffer)                                                                                                        \
       kfree(buffer);                                                                                                   \
+    /* Return path is allocated but the length of the path is 0, so it needs to be freed */                            \
     if (*len_ptr == 0 && path_ptr) {                                                                                   \
       kfree(path_ptr);                                                                                                 \
       path_ptr = NULL;                                                                                                 \

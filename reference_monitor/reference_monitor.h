@@ -11,11 +11,17 @@
 #define PASSWORD_MAX_LEN 128
 
 struct reference_monitor_path {
-  unsigned long i_ino;
-  struct list_head next;
+  unsigned long i_ino;   // inode number of protected path
+  struct list_head next; // next element in the protected paths
 };
 
-enum reference_monitor_state { RM_OFF, RM_ON, RM_REC_OFF, RM_REC_ON };
+// State of the Reference Monitor
+enum reference_monitor_state {
+  RM_OFF,     // Inactive (every operation is permitted)
+  RM_ON,      // Active (not all operations are permitted)
+  RM_REC_OFF, // Inactive but can be reconfigured (add/delete paths)
+  RM_REC_ON   // Active and can be reconfigured
+};
 
 struct reference_monitor {
   enum reference_monitor_state state; // Reference Monitor State

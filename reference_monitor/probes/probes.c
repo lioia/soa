@@ -46,7 +46,6 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
   work->operation = data->operation;
   work->primary_file_path = data->primary_file_path;
   work->secondary_file_path = data->secondary_file_path;
-  work->operation_len = data->operation_len;
   work->primary_file_path_len = data->primary_file_path_len;
   work->secondary_file_path_len = data->secondary_file_path_len;
   work->tgid = current->tgid;
@@ -63,7 +62,6 @@ static int probe_post_handler(struct kretprobe_instance *p, struct pt_regs *regs
 
   // Schedule deferred work
   __INIT_WORK(&(work->the_work), (void *)write_to_log, (unsigned long)(&(work->the_work)));
-
   schedule_work(&work->the_work);
   goto exit;
 
@@ -306,7 +304,6 @@ int probes_disable(void) {
 int fill_probe_data(struct reference_monitor_probe_data *data, char *operation, struct dentry *primary,
                     struct dentry *secondary) {
   data->operation = operation;
-  data->operation_len = 7; // Max operation length (symlink)
 
   data->primary_file_path = get_pathname_from_dentry(primary, &data->primary_file_path_len);
   if (data->primary_file_path == NULL)

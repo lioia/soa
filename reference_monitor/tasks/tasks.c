@@ -1,11 +1,10 @@
-#include "tasks.h"
-
 #include <linux/fs.h>
 #include <linux/printk.h>
 #include <linux/slab.h>
 
 #include "../reference_monitor.h"
 #include "../utils/utils.h"
+#include "tasks.h"
 
 void write_to_log(unsigned long data) {
   struct reference_monitor_packed_work *work = NULL;
@@ -30,10 +29,11 @@ void write_to_log(unsigned long data) {
   // Create output string
 
   // Calculating overfitted buffer for line
+  // - 7: max length of operation (symlink)
   // - 4 * 10: max number of digits for the ids
   // - 9: commas, newline, NULL-terminator
-  len = work->operation_len + 4 * 10 + work->primary_file_path_len + work->secondary_file_path_len +
-        work->program_path_len + hash_len + 9;
+  len =
+      7 + 4 * 10 + work->primary_file_path_len + work->secondary_file_path_len + work->program_path_len + hash_len + 9;
 
   line = kzalloc(sizeof(*line) * len, GFP_KERNEL);
   if (line == NULL) {

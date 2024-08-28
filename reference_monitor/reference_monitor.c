@@ -1,5 +1,3 @@
-#include "linux/rculist.h"
-#include "linux/rcupdate.h"
 #define EXPORT_SYMTAB
 
 #include <asm/apic.h>
@@ -18,6 +16,8 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/printk.h>
+#include <linux/rculist.h>
+#include <linux/rcupdate.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -45,8 +45,14 @@ extern long sys_reference_monitor_set_state;
 extern long sys_reference_monitor_add_path;
 extern long sys_reference_monitor_delete_path;
 
+// Allocation of reference monitor struct
 struct reference_monitor refmon = {0};
 
+/**
+ * @brief Init function of the reference monitor
+ *
+ * @return non-zero on error
+ */
 static int reference_monitor_init(void) {
   // Variable Declaration
   int i, ret;
@@ -78,7 +84,7 @@ static int reference_monitor_init(void) {
   pr_info("%s: all new system-calls correctly installed on sys-call table\n", MODNAME);
 
   // Reference Monitor initialization
-  refmon.state = RM_OFF;
+  refmon.state = RM_OFF; // Initial state is inactive
   refmon.password_hash = kmalloc(sizeof(*refmon.password_hash) * SHA_LENGTH, GFP_KERNEL);
   if (refmon.password_hash == NULL) {
     pr_err(KERN_ERR "failed to allocate password_hash\n");
@@ -91,10 +97,11 @@ static int reference_monitor_init(void) {
     pr_err(KERN_ERR "failed to crypt_data for default password\n");
     return -ENOMEM;
   }
-  spin_lock_init(&refmon.lock);
-  INIT_LIST_HEAD(&refmon.list);
-  probes_init();
-  ret = probes_disable();
+
+  spin_lock_init(&refmon.lock); // Initialize lock used for editing the RCU list
+  INIT_LIST_HEAD(&refmon.list); // Initialize the RCU list of protected paths
+  probes_init();                // Initialize probes
+  ret = probes_disable();       // State is OFF -> probes are disabled
   if (ret != 0) {
     pr_info("%s: probes_disable failed\n", MODNAME);
     return ret;
@@ -105,6 +112,9 @@ static int reference_monitor_init(void) {
   return ret;
 }
 
+/**
+ * @brief Cleanup function of the reference monitor module
+ */
 static void reference_monitor_cleanup(void) {
   // Variable Declaration
   int i = 0;
@@ -113,16 +123,17 @@ static void reference_monitor_cleanup(void) {
   // Reference Monitor Cleanup
   kfree(refmon.password_hash);
   if (refmon.state == RM_ON || refmon.state == RM_REC_ON)
-    probes_disable();
-  probes_deinit();
+    probes_disable(); // Reference Monitor is active -> disable probes
+  probes_deinit();    // Deregister probes
 
   // Free all paths
-  spin_lock(&refmon.lock);
-  rcu_read_lock();
+  spin_lock(&refmon.lock); // Editing RCU List, lock is required
+  rcu_read_lock();         // Traversing List
   list_for_each_entry_rcu(node, &refmon.list, next) {
-    list_del_rcu(&node->next);
-    kfree(node);
+    list_del_rcu(&node->next); // Remove node
+    kfree(node);               // Free memory of node
   }
+  // Unlock locks
   rcu_read_unlock();
   spin_unlock(&refmon.lock);
 
