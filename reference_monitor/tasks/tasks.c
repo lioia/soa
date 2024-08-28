@@ -32,9 +32,7 @@ void write_to_log(unsigned long data) {
   hash = crypt_data(work->program_path, true);
   if (hash == NULL) {
     pr_err("%s: crypt_data failed in write_to_log\n", MODNAME);
-    pr_info("%s-log: %s,%d,%d,%d,%d,%s,%s,%s", MODNAME, work->operation, work->tgid, work->tid, work->uid, work->euid,
-            primary_file_path, secondary_file_path, work->program_path);
-    goto exit;
+    hash = "unavailable";
   }
 
   // Create output string
