@@ -149,6 +149,7 @@ asmlinkage long sys_reference_monitor_add_path(const char *password, const char 
   // Node found, so the path is already in the list
   if (node != NULL) {
     pr_info("%s: path already in list in syscall add_path\n", MODNAME);
+    ret = -EINVAL;
     goto exit;
   }
   // Node not found; creating new one
@@ -202,7 +203,8 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
   // Check if it can be reconfigured
   if (refmon.state != RM_REC_ON && refmon.state != RM_REC_OFF) {
     pr_info("%s: state does not allow to reconfigure\n", MODNAME);
-    return -EPERM;
+    ret = -EPERM;
+    goto exit;
   }
 
   // Clear buffer for reusage
@@ -218,13 +220,18 @@ asmlinkage long sys_reference_monitor_delete_path(const char *password, const ch
   // Getting the dentry from the pathname
   dentry = get_dentry_from_pathname(buffer);
   if (ret != 0) {
-    pr_err("%s: get_dentry_from_path failed in syscall add_path\n", MODNAME);
+    pr_err("%s: get_dentry_from_path failed in syscall delete_path\n", MODNAME);
     ret = -EINVAL;
     goto exit;
   }
 
   // Search for the inode number in the RCU list
   node = search_for_path_in_list(dentry->d_inode->i_ino);
+  if (node == NULL) {
+    pr_err("%s: path not found in list in syscall delete_path\n", MODNAME);
+    ret = -EINVAL;
+    goto exit;
+  }
 
   // If found, remove from the list
   if (node) {
