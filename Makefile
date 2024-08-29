@@ -32,7 +32,7 @@ build-user:
 
 --mount-rm:
 	@echo "Mounting Reference Monitor Module"
-	sudo insmod reference_monitor/the_reference_monitor.ko the_syscall_table=$(SYS_CALL_TABLE_ADDRESS) password=$(PASSWORD)
+	sudo insmod reference_monitor/the_reference_monitor.ko the_syscall_table=$(SYS_CALL_TABLE_ADDRESS) password=\"$(PASSWORD)\"
 
 --mount-sffs:
 	@echo "Mounting Single File File System Module"
