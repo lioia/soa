@@ -1,11 +1,12 @@
 SYS_CALL_TABLE_ADDRESS = $(shell sudo cat /sys/module/the_usctm/parameters/sys_call_table_address)
+PASSWORD?=refmon_default_password
 
 all: clean build
 build: build-modules build-user
-install: clean build mount
 mount: mount-modules mkfs mount-fs
+start: clean build mount
+stop: umount-modules umount-fs
 mount-modules: --mount-usctm --mount-rm --mount-sffs
-umount: umount-modules umount-fs
 
 clean:
 	@cd libs/sys_call_table_discoverer && $(MAKE) clean
@@ -32,7 +33,7 @@ build-user:
 
 --mount-rm:
 	@echo "Mounting Reference Monitor Module"
-	sudo insmod reference_monitor/the_reference_monitor.ko the_syscall_table=$(SYS_CALL_TABLE_ADDRESS)
+	sudo insmod reference_monitor/the_reference_monitor.ko the_syscall_table=$(SYS_CALL_TABLE_ADDRESS) password=$(PASSWORD)
 
 --mount-sffs:
 	@echo "Mounting Single File File System Module"

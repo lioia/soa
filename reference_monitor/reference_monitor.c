@@ -14,6 +14,7 @@
 #include <linux/kprobes.h>
 #include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/mutex.h>
 #include <linux/printk.h>
 #include <linux/rculist.h>
@@ -31,6 +32,9 @@
 #include "probes/probes.h"
 #include "reference_monitor.h"
 #include "utils/utils.h"
+
+char *password = NULL;
+module_param(password, charp, 0000);
 
 unsigned long the_syscall_table = 0x0;
 module_param(the_syscall_table, ulong, 0660);
@@ -90,9 +94,8 @@ static int reference_monitor_init(void) {
     pr_err(KERN_ERR "failed to allocate password_hash\n");
     return -ENOMEM;
   }
-  refmon.password_hash = crypt_data("1", false);
-  /* TODO: Restore */
-  /*  refmon.password_hash = crypt_data("refmon_default", false);*/
+  pr_info("password is %s\n", password);
+  refmon.password_hash = crypt_data(password, false);
   if (refmon.password_hash == NULL) {
     pr_err(KERN_ERR "failed to crypt_data for default password\n");
     return -ENOMEM;

@@ -12,22 +12,34 @@
 #include "user.h"
 #include "utils.h"
 
-#ifndef PASSWORD
-#define PASSWORD "1"
-#endif
-
 #define TEST_ROOT "/tmp/reference-monitor-tests"
 #define TEST_DIRECTORY "/tmp/reference-monitor-tests/directory"
 #define TEST_DIRECTORY_FILE "/tmp/reference-monitor-tests/directory/file.txt"
 #define TEST_FILE "/tmp/reference-monitor-tests/file.txt"
 
-#define RUN_TEST(test_name)                                                                                            \
+#define RUN_TEST(test_name, password)                                                                                  \
   do {                                                                                                                 \
     int ret = 0;                                                                                                       \
     if (setup() != 0)                                                                                                  \
       return EXIT_FAILURE;                                                                                             \
+    if (syscall(SET_STATE, password, 3) != 0) {                                                                        \
+      perror("Failed to set state to REC-ON");                                                                         \
+      return EXIT_FAILURE;                                                                                             \
+    }                                                                                                                  \
+    if (syscall(ADD_PATH, password, TEST_DIRECTORY) != 0) {                                                            \
+      perror("Failed to add directory to protected path");                                                             \
+      return EXIT_FAILURE;                                                                                             \
+    }                                                                                                                  \
+    if (syscall(ADD_PATH, password, TEST_FILE) != 0) {                                                                 \
+      perror("Failed to add file.txt to protected path");                                                              \
+      return EXIT_FAILURE;                                                                                             \
+    }                                                                                                                  \
     if ((ret = test_name##_test()) != 0)                                                                               \
       fprintf(stderr, "%s test failed\n", #test_name);                                                                 \
+    if (syscall(SET_STATE, password, 0) != 0) {                                                                        \
+      perror("Failed to set state to OFF");                                                                            \
+      return EXIT_FAILURE;                                                                                             \
+    }                                                                                                                  \
     if (cleanup(TEST_ROOT) != 0)                                                                                       \
       return EXIT_FAILURE;                                                                                             \
     if (ret != 0)                                                                                                      \
@@ -41,14 +53,21 @@ int main(void) {
   if (check_if_module_is_inserted() != 0)
     exit(EXIT_FAILURE);
 
-  RUN_TEST(create);
-  RUN_TEST(open);
-  RUN_TEST(unlink);
-  RUN_TEST(link);
-  RUN_TEST(mkdir);
-  RUN_TEST(rmdir);
-  RUN_TEST(rename);
-  RUN_TEST(symlink);
+  printf("Enter password: ");
+  char *password = get_string(false);
+  if (password == NULL) {
+    fprintf(stderr, "Failed to get password\n");
+    return EXIT_FAILURE;
+  }
+
+  RUN_TEST(create, password);
+  RUN_TEST(open, password);
+  RUN_TEST(unlink, password);
+  RUN_TEST(link, password);
+  RUN_TEST(mkdir, password);
+  RUN_TEST(rmdir, password);
+  RUN_TEST(rename, password);
+  RUN_TEST(symlink, password);
 
   puts("Tests were successful");
   return EXIT_SUCCESS;
@@ -226,24 +245,6 @@ int setup(void) {
     return EXIT_FAILURE;
   }
 
-  // Set state to REC-ON
-  if (syscall(SET_STATE, PASSWORD, 3) != 0) {
-    puts(" set state to REC-");
-    return EXIT_FAILURE;
-  }
-
-  // Add directory to protected paths
-  if (syscall(ADD_PATH, PASSWORD, TEST_DIRECTORY) != 0) {
-    puts(" add directory to protected pat");
-    return -1;
-  }
-
-  // Add file in root to protected paths
-  if (syscall(ADD_PATH, PASSWORD, TEST_FILE) != 0) {
-    puts(" add file.txt to protected pat");
-    return -1;
-  }
-
   return 0;
 }
 
@@ -252,12 +253,6 @@ int cleanup(char *path) {
   struct dirent *entry;
   struct stat statstruct;
   char fullpath[PATH_MAX];
-
-  // Set state to OFF
-  if (syscall(SET_STATE, PASSWORD, 0) != 0) {
-    perror("Failed to set state to OFF");
-    return EXIT_FAILURE;
-  }
 
   // Try to open path as directory
   if ((dir = opendir(path)) == NULL) {

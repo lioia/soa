@@ -1,8 +1,6 @@
 obj-m += the_sffs.o
 the_sffs-objs += sffs.o src/fs.o src/file.o src/dir.o
 
-CFLAGS_MODULE := -g
-
 all: clean build
 
 build: build-module build-user
