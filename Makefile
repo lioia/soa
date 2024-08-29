@@ -4,8 +4,7 @@ PASSWORD?=refmon_default_password
 all: clean build
 build: build-modules build-user
 mount: mount-modules mkfs mount-fs
-start: clean build mount
-stop: umount-modules umount-fs
+umount: umount-modules umount-fs
 mount-modules: --mount-usctm --mount-rm --mount-sffs
 
 clean:
