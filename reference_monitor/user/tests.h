@@ -2,6 +2,7 @@
 #define TESTS
 
 // Tests
+int run_test(int (*func)(void), char *password);
 int create_test(void);
 int open_test(void);
 int unlink_test(void);

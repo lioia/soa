@@ -17,37 +17,6 @@
 #define TEST_DIRECTORY_FILE "/tmp/reference-monitor-tests/directory/file.txt"
 #define TEST_FILE "/tmp/reference-monitor-tests/file.txt"
 
-#define RUN_TEST(test_name, password)                                                                                  \
-  do {                                                                                                                 \
-    int ret = 0;                                                                                                       \
-    if (setup() != 0)                                                                                                  \
-      return EXIT_FAILURE;                                                                                             \
-    if (syscall(SET_STATE, password, 3) != 0) {                                                                        \
-      perror("Failed to set state to REC-ON");                                                                         \
-      return EXIT_FAILURE;                                                                                             \
-    }                                                                                                                  \
-    if (syscall(ADD_PATH, password, TEST_DIRECTORY) != 0) {                                                            \
-      perror("Failed to add directory to protected path");                                                             \
-      return EXIT_FAILURE;                                                                                             \
-    }                                                                                                                  \
-    if (syscall(ADD_PATH, password, TEST_FILE) != 0) {                                                                 \
-      perror("Failed to add file.txt to protected path");                                                              \
-      return EXIT_FAILURE;                                                                                             \
-    }                                                                                                                  \
-    if ((ret = test_name##_test()) != 0)                                                                               \
-      fprintf(stderr, "%s test failed\n", #test_name);                                                                 \
-    if (syscall(SET_STATE, password, 0) != 0) {                                                                        \
-      perror("Failed to set state to OFF");                                                                            \
-      return EXIT_FAILURE;                                                                                             \
-    }                                                                                                                  \
-    if (cleanup(TEST_ROOT) != 0)                                                                                       \
-      return EXIT_FAILURE;                                                                                             \
-    if (ret != 0)                                                                                                      \
-      return EXIT_FAILURE;                                                                                             \
-    else                                                                                                               \
-      printf("%s test was successful\n", #test_name);                                                                  \
-  } while (0)
-
 int main(void) {
   // Check if module is loaded
   if (check_if_module_is_inserted() != 0)
@@ -60,17 +29,87 @@ int main(void) {
     return EXIT_FAILURE;
   }
 
-  RUN_TEST(create, password);
-  RUN_TEST(open, password);
-  RUN_TEST(unlink, password);
-  RUN_TEST(link, password);
-  RUN_TEST(mkdir, password);
-  RUN_TEST(rmdir, password);
-  RUN_TEST(rename, password);
-  RUN_TEST(symlink, password);
+  if (run_test(create_test, password) != 0) {
+    fprintf(stderr, "create test failed\n");
+    return EXIT_FAILURE;
+  }
+  if (run_test(open_test, password) != 0) {
+    fprintf(stderr, "open test failed\n");
+    return EXIT_FAILURE;
+  }
+  if (run_test(unlink_test, password) != 0) {
+    fprintf(stderr, "unlink test failed\n");
+    return EXIT_FAILURE;
+  }
+  if (run_test(link_test, password) != 0) {
+    fprintf(stderr, "link test failed\n");
+    return EXIT_FAILURE;
+  }
+  if (run_test(mkdir_test, password) != 0) {
+    fprintf(stderr, "mkdir test failed\n");
+    return EXIT_FAILURE;
+  }
+  if (run_test(rmdir_test, password) != 0) {
+    fprintf(stderr, "rmdir test failed\n");
+    return EXIT_FAILURE;
+  }
+  if (run_test(rename_test, password) != 0) {
+    fprintf(stderr, "rename test failed\n");
+    return EXIT_FAILURE;
+  }
+  if (run_test(symlink_test, password) != 0) {
+    fprintf(stderr, "symlink test failed\n");
+    return EXIT_FAILURE;
+  }
 
   puts("Tests were successful");
   return EXIT_SUCCESS;
+}
+
+int run_test(int (*func)(void), char *password) {
+  int ret = 0;
+  // Setup test environment
+  if (setup() != 0) {
+    ret = -1;
+    goto exit;
+  }
+
+  // Set state to REC-ON
+  if (syscall(SET_STATE, password, 3) != 0) {
+    perror("Failed to set state to REC-ON");
+    ret = -1;
+    goto exit;
+  }
+
+  // Add directory to protected paths
+  if (syscall(ADD_PATH, password, TEST_DIRECTORY) != 0) {
+    perror("Failed to add directory to protected path");
+    ret = -1;
+    goto exit;
+  }
+
+  // Add file to protected paths
+  if (syscall(ADD_PATH, password, TEST_FILE) != 0) {
+    perror("Failed to add file.txt to protected path");
+    ret = -1;
+    goto exit;
+  }
+
+  // Execute test
+  ret = func();
+
+  // Set state to OFF
+  if (syscall(SET_STATE, password, 0) != 0) {
+    perror("Failed to set state to OFF");
+    ret = -1;
+    goto exit;
+  }
+
+exit:
+  // Cleanup test environment
+  if (cleanup(TEST_ROOT) != 0)
+    return -1;
+  return ret;
 }
 
 // Attempts to create file or directory in protected directory
