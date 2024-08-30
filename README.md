@@ -27,6 +27,14 @@ make umount
 
 [**Specs**](./docs/specs.md)
 
+The project was tested on the following Kernel versions:
+
+- 4.19.0 on Linux Mint Debian Edition 4
+- 5.4.0 on Linux Mint 20.3
+- 5.10.103 on Linux Mint Debian Edition 5
+- 5.15.0 on Linux Mint 21.3
+- 6.1.52 on Linux Mint Debian Edition 6
+
 ### Reference Monitor
 
 The Reference Monitor module handles a `struct reference_monitor` that contains
